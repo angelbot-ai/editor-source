@@ -1,13 +1,13 @@
 # liimee <alt3753.7@gmail.com>, 2021.
 # Reza Almanda <rezaalmanda27@gmail.com>, 2021.
-# Andika Triwidada <andika@gmail.com>, 2024.
+# Andika Triwidada <andika@gmail.com>, 2024, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-17 08:08+0200\n"
-"PO-Revision-Date: 2024-09-27 17:15+0000\n"
-"Last-Translator: Andika Triwidada <andika@gmail.com>\n"
+"POT-Creation-Date: 2026-02-13 19:20+0200\n"
+"PO-Revision-Date: 2026-02-03 13:13+0000\n"
+"Last-Translator: Anonymous <noreply@weblate.org>\n"
 "Language-Team: Indonesian <https://hosted.weblate.org/projects/collabora-"
 "online/app-store-descriptions/id/>\n"
 "Language: id\n"

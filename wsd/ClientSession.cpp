@@ -32,7 +32,6 @@
 #include <wsd/FileServer.hpp>
 #include <wsd/TileDesc.hpp>
 
-#include <Poco/Base64Decoder.h>
 #include <Poco/JSON/Parser.h>
 #include <Poco/MemoryStream.h>
 #include <Poco/Net/HTTPResponse.h>
@@ -397,9 +396,18 @@ void ClientSession::handleClipboardRequest(DocumentBroker::ClipboardRequest     
                     std::string commandName;
                     JsonUtil::findJSONValue(json, "commandName", commandName);
                     http::Session::FinishedCallback finishedCallback =
-                        [this, commandName=std::move(commandName),
+                        [selfWeak = weak_from_this(), this, commandName=std::move(commandName),
                          docBroker, jailClipFile, clipFile](const std::shared_ptr<http::Session>& session)
                     {
+                        std::shared_ptr<MessageHandlerInterface> selfLifecycle = selfWeak.lock();
+                        if (!selfLifecycle)
+                        {
+                            LOG_ERR_S("Session that requested: " << clipFile << " has already ended.");
+                            if (UnitWSD::isUnitTesting())
+                                UnitWSD::get().onClipboardDownloadSessionGone();
+                            return;
+                        }
+
                         const std::shared_ptr<const http::Response> httpResponse =
                             session->response();
                         if (httpResponse->statusLine().statusCode() != http::StatusCode::OK)
@@ -431,6 +439,9 @@ void ClientSession::handleClipboardRequest(DocumentBroker::ClipboardRequest     
                         }
                     };
 
+                    if (UnitWSD::isUnitTesting())
+                        UnitWSD::get().filterClipboardDownloadURL(url);
+
                     const std::string pathAndQuery = Poco::URI(url).getPathAndQuery();
                     if (pathAndQuery.find("/cool/clipboard") != std::string::npos)
                     {
@@ -448,6 +459,10 @@ void ClientSession::handleClipboardRequest(DocumentBroker::ClipboardRequest     
                             httpSession->setConnectFailHandler(std::move(connectFailCallback));
                             http::Request httpRequest(Poco::URI(url).getPathAndQuery());
                             httpSession->asyncRequest(httpRequest, docBroker->getPoll());
+
+                            if (UnitWSD::isUnitTesting())
+                                UnitWSD::get().onClipboardDownloadRequest(httpSession);
+
                             const std::shared_ptr<http::Response> httpResponse = httpSession->response();
                             httpResponse->saveBodyToFile(jailClipFile);
                         }
@@ -679,7 +694,7 @@ bool ClientSession::_handleInput(const char *buffer, int length)
                     {
                         COOLWSD::writeTraceEventRecording("{\"name\":"
                                                           + name
-                                                          + ",\"ph\":\"i\""
+                                                          + R"(,"ph":"i")"
                                                           + args
                                                           + ",\"ts\":"
                                                           + std::to_string(ts + _performanceCounterEpoch)
@@ -695,7 +710,7 @@ bool ClientSession::_handleInput(const char *buffer, int length)
                     {
                         COOLWSD::writeTraceEventRecording("{\"name\":"
                                                           + name
-                                                          + ",\"ph\":\""
+                                                          + R"(,"ph":")"
                                                           + ph
                                                           + "\""
                                                           + args
@@ -714,7 +729,7 @@ bool ClientSession::_handleInput(const char *buffer, int length)
                     {
                         COOLWSD::writeTraceEventRecording("{\"name\":"
                                                           + name
-                                                          + ",\"ph\":\"X\""
+                                                          + R"(,"ph":"X")"
                                                           + args
                                                           + ",\"ts\":"
                                                           + std::to_string(ts + _performanceCounterEpoch)
@@ -1634,10 +1649,15 @@ void ClientSession::overrideDocOption()
 
     // follow darkTheme preference if darkBackgroundForTheme is not set
     if (darkBackgroundObj.isNull())
-        setDarkBackground(darkTheme);
+    {
+        if (!darkTheme.empty())
+            setDarkBackground(darkTheme);
+    }
     else
+    {
         JsonUtil::findJSONValue(darkBackgroundObj, darkTheme == "true" ? "dark" : "light",
                                 darkBackgroundForTheme);
+    }
 
     if (!darkTheme.empty())
     {
@@ -2023,30 +2043,9 @@ bool ClientSession::filterMessage(const std::string& message) const
     if (tokens.equals(0, "downloadas"))
     {
         std::string id;
-        if (tokens.size() >= 3 && getTokenString(tokens[2], "id", id))
-        {
-            if (id == "print" && _wopiFileInfo && _wopiFileInfo->getDisablePrint())
-            {
-                allowed = false;
-                LOG_WRN("WOPI host has disabled print for this session");
-            }
-            else if (id == "export" && _wopiFileInfo && _wopiFileInfo->getDisableExport())
-            {
-                allowed = false;
-                LOG_WRN("WOPI host has disabled export for this session");
-            }
-            else if (id == "slideshow" && _wopiFileInfo &&
-                     (_wopiFileInfo->getDisableExport() || !_wopiFileInfo->getWatermarkText().empty()))
-            {
-                allowed = false;
-                LOG_WRN("WOPI host has disabled slideshow for this session");
-            }
-        }
-        else
-        {
-            allowed = false;
-            LOG_WRN("No value of id in downloadas message");
-        }
+        if (tokens.size() >= 3)
+            getTokenString(tokens[2], "id", id);
+        allowed = filterDownloadAs(id);
     }
     else if (tokens.equals(0, "gettextselection"))
     {
@@ -2059,6 +2058,37 @@ bool ClientSession::filterMessage(const std::string& message) const
         }
     }
 
+    return allowed;
+}
+
+bool ClientSession::filterDownloadAs(const std::string& id) const
+{
+    bool allowed = true;
+
+    if (!id.empty())
+    {
+        if (id == "print" && _wopiFileInfo && _wopiFileInfo->getDisablePrint())
+        {
+            allowed = false;
+            LOG_WRN("WOPI host has disabled print for this session");
+        }
+        else if (id == "export" && _wopiFileInfo && _wopiFileInfo->getDisableExport())
+        {
+            allowed = false;
+            LOG_WRN("WOPI host has disabled export for this session");
+        }
+        else if (id == "slideshow" && _wopiFileInfo &&
+                 (_wopiFileInfo->getDisableExport() || !_wopiFileInfo->getWatermarkText().empty()))
+        {
+            allowed = false;
+            LOG_WRN("WOPI host has disabled slideshow for this session");
+        }
+    }
+    else
+    {
+        allowed = false;
+        LOG_WRN("No value of id in downloadas message");
+    }
     return allowed;
 }
 
@@ -2340,7 +2370,18 @@ bool ClientSession::handleKitToClientMessage(const std::shared_ptr<Message>& pay
         COOLWSD::dumpOutgoingTrace(docBroker->getJailId(), getId(), firstLine);
 
     const auto& tokens = payload->tokens();
-    if (tokens.equals(0, "unocommandresult:"))
+    if (tokens.equals(0, "downloadas:"))
+    {
+        std::string id;
+        if (tokens.size() >= 4)
+            getTokenString(tokens[3], "id", id);
+        if (!filterDownloadAs(id))
+        {
+            LOG_WRN("Ignoring kit to client message of: " << firstLine);
+            return false;
+        }
+    }
+    else if (tokens.equals(0, "unocommandresult:"))
     {
         LOG_INF("Command: " << firstLine);
         const std::string stringJSON = payload->jsonString();

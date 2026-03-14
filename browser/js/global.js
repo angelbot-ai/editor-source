@@ -46,8 +46,6 @@ class BrowserProperties {
 		let uv = navigator.vendor.toLowerCase();
 		let doc = document.documentElement;
 
-		let ie = 'ActiveXObject' in global;
-
 		let cypressTest = ua.indexOf('cypress') !== -1;
 
 		// Firefox has undefined navigator.clipboard.read and navigator.clipboard.write,
@@ -57,7 +55,7 @@ class BrowserProperties {
 
 		let webkit    = ua.indexOf('webkit') !== -1;
 		let chrome    = ua.indexOf('chrome') !== -1;
-		let gecko     = (ua.indexOf('gecko') !== -1 || (cypressTest && 'MozUserFocus' in doc.style)) && !webkit && !global.opera && !ie;
+		let gecko     = (ua.indexOf('gecko') !== -1 || (cypressTest && 'MozUserFocus' in doc.style)) && !webkit && !global.opera;
 		let safari    = !chrome && (ua.indexOf('safari') !== -1 || uv.indexOf('apple') == 0);
 
 		let win = navigator.platform.indexOf('Win') === 0;
@@ -89,10 +87,6 @@ class BrowserProperties {
 		}
 
 		window.L.Browser = {
-			// @property ie: Boolean
-			// `true` for all Internet Explorer versions (not Edge).
-			ie: ie,
-
 			// @property edge: Boolean
 			// `true` for the Edge web browser.
 			edge: 'msLaunchUri' in navigator && !('documentMode' in document),
@@ -268,6 +262,7 @@ class InitializerBase {
 		window.geolocationSetup = false;
 		window.canvasSlideshowEnabled = false;
 		window.wopiSettingBaseUrl = element.dataset.wopiSettingBaseUrl;
+		window.enableExperimentalFeatures = element.dataset.enableExperimentalFeatures;
 
 		window.tileSize = 256;
 
@@ -417,6 +412,9 @@ class BrowserInitializer extends InitializerBase {
 		window.geolocationSetup = element.dataset.geolocationSetup.toLowerCase().trim() === "true";
 		window.canvasSlideshowEnabled = element.dataset.canvasSlideshowEnabled.toLowerCase().trim() === "true";
 		window.wopiSettingBaseUrl = element.dataset.wopiSettingBaseUrl;
+		window.wopiHostId = element.dataset.wopiHostId;
+		window.vendor = element.dataset.vendor;
+		window.copyrightYear = element.dataset.copyrightYear;
 	}
 
 	postMessageHandler(e) {
@@ -554,7 +552,7 @@ function getInitializerClass() {
 			   (global.socket instanceof global.app.definitions.Socket) && global.socket.connected()) {
 			global.socket.sendMessage(log);
 		} else {
-			fetch(global.location.pathname.match(/.*\//) + 'logging.html', {
+			fetch(global.location.pathname.match(/.*\//) + 'browser-logging', {
 				method: 'POST',
 				headers: { 'Content-Type' : 'application/json' },
 				body: global.coolLogging + ' ' + log

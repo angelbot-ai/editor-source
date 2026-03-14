@@ -3,10 +3,15 @@
 
 AC_PREREQ([2.63])
 
-AC_INIT([coolwsd], [25.04.8.1], [https://github.com/CollaboraOnline/online/issues], [coolwsd], [https://collaboraonline.github.io/])
+AC_INIT([coolwsd], [25.04.9.2], [https://github.com/CollaboraOnline/online/issues], [coolwsd], [https://collaboraonline.github.io/])
 LT_INIT([shared, disable-static, dlopen])
 
 AM_INIT_AUTOMAKE([1.10 foreign subdir-objects tar-pax -Wno-portability])
+
+# Drop the 'u' from automake's default 'cru' to silence the warning:
+# "ar: `u' modifier ignored since `D' is the default (see `U')"
+# Don't use 'crD' as the 'D' flag is GNU-specific and unsupported on macOS/FreeBSD.
+AC_SUBST([ARFLAGS], [cr])
 
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -740,7 +745,7 @@ if test \( "$enable_iosapp" = "yes" -a `uname -s` = "Darwin" \) -o \( "$enable_a
    # Sanity checks
    CHK_FILE_VAR(POCOINCLUDE,Poco/Poco.h,Poco include)
    CHK_FILE_VAR(POCOINCLUDE,Poco/Poco.h,Poco include,_ARM64_V8A)
-   CHK_FILE_VAR(POCOINCLUDE,Poco/Poco.h,Poco include,_X64)
+   CHK_FILE_VAR(POCOINCLUDE,Poco/Poco.h,Poco include,_X86)
    CHK_FILE_VAR(POCOINCLUDE,Poco/Poco.h,Poco include,_X86_64)
 
    AC_MSG_CHECKING([for Poco lib directory to build against])
@@ -771,8 +776,8 @@ if test \( "$enable_iosapp" = "yes" -a `uname -s` = "Darwin" \) -o \( "$enable_a
    # Sanity checks
    CHK_FILE_VAR(POCOLIB,libPocoFoundation.a,Poco lib)
    CHK_FILE_VAR(POCOLIB,libPocoFoundation.a,Poco lib,_ARM64_V8A)
-   CHK_FILE_VAR(POCOLIB,libPocoFoundation.a,Poco lib,_X64)
-   CHK_FILE_VAR(POCOLIB,libPocoFoundation.a,Poco lib,_X86_X64)
+   CHK_FILE_VAR(POCOLIB,libPocoFoundation.a,Poco lib,_X86)
+   CHK_FILE_VAR(POCOLIB,libPocoFoundation.a,Poco lib,_X86_64)
 
    if test "$ENABLE_DEBUG" = "true" ; then
        POCODEBUG=d
@@ -806,7 +811,7 @@ if test \( "$enable_iosapp" = "yes" -a `uname -s` = "Darwin" \) -o \( "$enable_a
    # Sanity checks
    CHK_FILE_VAR(ZSTDINCLUDE,zstd.h,Zstd include)
    CHK_FILE_VAR(ZSTDINCLUDE,zstd.h,Zstd include,_ARM64_V8A)
-   CHK_FILE_VAR(ZSTDINCLUDE,zstd.h,Zstd include,_X64)
+   CHK_FILE_VAR(ZSTDINCLUDE,zstd.h,Zstd include,_X86)
    CHK_FILE_VAR(ZSTDINCLUDE,zstd.h,Zstd include,_X86_64)
 
    ZSTDLIB="$with_zstd_libs"
@@ -831,7 +836,7 @@ if test \( "$enable_iosapp" = "yes" -a `uname -s` = "Darwin" \) -o \( "$enable_a
 
    CHK_FILE_VAR(ZSTDLIB,libzstd.a,Zstd lib)
    CHK_FILE_VAR(ZSTDLIB,libzstd.a,Zstd lib,_ARM64_V8A)
-   CHK_FILE_VAR(ZSTDLIB,libzstd.a,Zstd lib,_X64)
+   CHK_FILE_VAR(ZSTDLIB,libzstd.a,Zstd lib,_X86)
    CHK_FILE_VAR(ZSTDLIB,libzstd.a,Zstd lib,_X86_64)
 fi
 
@@ -984,8 +989,10 @@ AM_CONDITIONAL([ENABLE_WASM_FALLBACK], [test -n "$with_wasm_fallback"])
 WASM_BUILDDIR="$with_wasm_fallback"
 AC_SUBST(WASM_BUILDDIR)
 AS_IF([test -n "$with_wasm_fallback"],
-      [WASM_SUPPORT_ENABLE=true],
-      [WASM_SUPPORT_ENABLE=false])
+      [WASM_SUPPORT_ENABLE=true
+       AC_DEFINE([ENABLE_WASM_SUPPORT],1,[Define to 1 if the "fallback to Wasm" capability is enabled])],
+      [WASM_SUPPORT_ENABLE=false
+       AC_DEFINE([ENABLE_WASM_SUPPORT],0,[Define to 1 if the "fallback to Wasm" capability is enabled])])
 AC_SUBST(WASM_SUPPORT_ENABLE)
 
 AM_CONDITIONAL([ENABLE_WASM_ADDITIONAL_FILES], [test -n "$with_wasm_additional_files"])
@@ -1146,7 +1153,7 @@ if test "x$with_coverage" != "x"; then
 
     AC_DEFUN([AC_PROG_LCOV], [AC_CHECK_PROG(LCOV,lcov,yes)])
     AC_PROG_LCOV
-    if test x"${LCOV}" == x"yes" ; then
+    if test x"${LCOV}" = x"yes" ; then
         AC_MSG_RESULT([yes ($with_coverage)])
         CODE_COVERAGE=1
         CXXFLAGS="$CXXFLAGS --coverage"
@@ -1213,6 +1220,18 @@ if test "x$with_sanitizer" != "x"; then
     CFLAGS="$CFLAGS $SANITIZER_FLAGS"
 else
     AC_MSG_RESULT([no])
+fi
+ENABLE_RUNTIME_OPTIMIZATIONS=
+for i in $CC; do
+    case $i in
+    -fsanitize=*)
+        ENABLE_RUNTIME_OPTIMIZATIONS=no
+        break
+        ;;
+    esac
+done
+if test "$ENABLE_RUNTIME_OPTIMIZATIONS" != no; then
+    AC_DEFINE([ENABLE_RUNTIME_OPTIMIZATIONS],1,[Define to 1 if this is not a santitizers build.])
 fi
 
 # Check for C++20 support.
@@ -1532,12 +1551,12 @@ AS_IF([test "$ENABLE_IOSAPP" != "true" -a "$ENABLE_ANDROIDAPP" != "true" -a "$ho
        AC_MSG_CHECKING([POCO version])
        AC_COMPILE_IFELSE([AC_LANG_SOURCE([
        #include <Poco/Version.h>
-       #if POCO_VERSION < 0x01070100
-       #error Require Poco 1.7.1 or newer
+       #if POCO_VERSION < 0x010C0000
+       #error Require Poco 1.12.0 or newer
        #endif
        ])],
                          [AC_MSG_RESULT([OK])],
-                         [AC_MSG_ERROR([The POCO version is too old])])
+                         [AC_MSG_ERROR([The POCO version is too old, 1.12.0 or newer required])])
 
        AC_MSG_CHECKING([POCO bugs])
        AC_COMPILE_IFELSE([AC_LANG_SOURCE([
@@ -1657,7 +1676,7 @@ AC_CONFIG_LINKS([browser/.prettierrc:browser/.prettierrc])
 AC_CONFIG_LINKS([cypress_test/package.json:cypress_test/package.json])
 AC_CONFIG_COMMANDS_PRE([
 if test "$srcdir" != '.'; then
-   dst_dirs="cypress_test/plugins cypress_test/eslint_plugin browser/archived-packages"
+   dst_dirs="cypress_test/plugins cypress_test/eslint_plugin browser/node_shrinkpack"
    src_dir=
    dir_name=
    for dst_dir in $dst_dirs

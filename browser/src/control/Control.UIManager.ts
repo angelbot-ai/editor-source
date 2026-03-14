@@ -32,6 +32,11 @@ interface UIModeCommand {
 	mode: UIMode;
 }
 
+// Type of the 'statusindicator' event payload.
+interface StatusIndicatorEvent {
+	statusType: string;
+}
+
 /**
  * UIManager class – initializes UI elements (toolbars, menubar, ruler, etc.) and controls their visibility.
  */
@@ -45,6 +50,7 @@ class UIManager extends window.L.Control {
 	hiddenCommands: { [key: string]: boolean } = {};
 	// Hidden Notebookbar tabs.
 	hiddenTabs: { [key: string]: boolean } = {};
+	permissionViewMode?: PermissionViewMode;
 
 	/**
 	 * Called when the UIManager control is added to the map.
@@ -357,21 +363,8 @@ class UIManager extends window.L.Control {
 		if (!isMobile && !enableNotebookbar)
 			this.map.topToolbar = JSDialog.TopToolbar(this.map);
 
-		// this will execute only when UI get initialized
-		if (!isMobile) {
-			this.topReadonlyBtn = document.getElementById('readonlyMode');
-			const label = this.topReadonlyBtn?.querySelector(
-				'.unolabel',
-			) as HTMLElement | null;
-			if (label) {
-				label.textContent = _('Read-only');
-				this.topReadonlyBtn.setAttribute('data-cooltip', _('Permission Mode'));
-				window.L.control.attachTooltipEventListener(
-					this.topReadonlyBtn,
-					this.map,
-				);
-			}
-		}
+		this.permissionViewMode = new PermissionViewMode(this.map);
+		this.permissionViewMode.init();
 	}
 
 	/**
@@ -561,6 +554,23 @@ class UIManager extends window.L.Control {
 				this.map.quickFindPanel = JSDialog.QuickFindPanel(this.map);
 				this.map.addControl(this.map.quickFindPanel);
 			}
+
+			if (this.getStartCompareChanges()) {
+				// Don't switch to the comparechanges view yet, first wait for the
+				// initializationcomplete event, which fires after
+				// app.activeDocument.fileSize is set, otherwise the tile manager
+				// would discard valid tiles.
+				const enterCompareChanges = (
+					e: StatusIndicatorEvent,
+				) => {
+					if (e.statusType !== 'initializationcomplete') {
+						return;
+					}
+					app.dispatcher.dispatch('comparechanges');
+					this.map.off('statusindicator', enterCompareChanges);
+				};
+				this.map.on('statusindicator', enterCompareChanges);
+			}
 		}
 
 		if (this.map.isPresentationOrDrawing() && (isDesktop || window.mode.isTablet())) {
@@ -575,7 +585,7 @@ class UIManager extends window.L.Control {
 
 		this.refreshTheme();
 
-		var startFolloMePresntationGet = this.map.isPresentationOrDrawing() && window.coolParams.get('startFollowMePresentation');
+		var startFolloMePresntationGet = this.map.isPresentationOrDrawing();
 		var presentationLeaderIdGet = this.map.isPresentationOrDrawing() && window.coolParams.get('presentationLeaderId');
 		var startPresentationGet = this.map.isPresentationOrDrawing() && window.coolParams.get('startPresentation');
 		if (this.map.wopi.PresentationLeader)
@@ -585,7 +595,10 @@ class UIManager extends window.L.Control {
 		// check for "presentation" dispatch event only after document gets fully loaded
 		// in case if the leader is defined we have to wait a little longer to get the viewer info
 		const startPresentation = () => {
-			if (startFolloMePresntationGet === 'true' || startFolloMePresntationGet === '1') {
+			if (startPresentationGet === 'true' || startPresentationGet === '1') {
+				app.dispatcher.dispatch('presentation');
+			}
+			else if (startFolloMePresntationGet) {
 				const dispatchFollowPresentation = () => {
 					app.dispatcher.dispatch('followpresentation');
 					this.map.off('slideshowfollowon', dispatchFollowPresentation);
@@ -611,9 +624,6 @@ class UIManager extends window.L.Control {
 					// This also help with if the follow me presentation is not running
 					this.map.on('slideshowfollowon', dispatchFollowPresentation);
 				}
-			}
-			else if (startPresentationGet === 'true' || startPresentationGet === '1') {
-				app.dispatcher.dispatch('presentation');
 			}
 
 			// docloaded event is fired multiple times, unfortunately
@@ -1141,13 +1151,21 @@ class UIManager extends window.L.Control {
 
 		var found = false;
 		if (this.getCurrentMode() === 'classic') {
-			found ||= this.showCommandInClassicToolbar(command, show);
-			found ||= this.showCommandInMenubar(command, show);
+			if (this.showCommandInClassicToolbar(command, show)) {
+				found = true;
+			}
+			if (this.showCommandInMenubar(command, show)) {
+				found = true;
+			}
 		}
 
 		if (this.notebookbar) {
-			if (this.getCurrentMode() === 'notebookbar') this.notebookbar.reloadShortcutsBar();
-			found ||= this.notebookbar.showNotebookbarCommand(command, show);
+			if (this.getCurrentMode() === 'notebookbar') {
+				this.notebookbar.reloadShortcutsBar();
+			}
+			if (this.notebookbar.showNotebookbarCommand(command, show)) {
+				found = true;
+			}
 		}
 
 		if (!found)
@@ -1447,6 +1465,12 @@ class UIManager extends window.L.Control {
 		this.map.fire('focussearch');
 	}
 
+	isNotebookbarInitialized() {
+		// `.notebookbar-scroll-wrapper.initialized`.
+		const wrapper = document.querySelector('.notebookbar-scroll-wrapper') as HTMLElement | null;
+		return !!wrapper && wrapper.classList.contains('initialized');
+	}
+
 	/**
 	 * Returns whether the status bar is visible.
 	 */
@@ -1475,43 +1499,29 @@ class UIManager extends window.L.Control {
 		var enableNotebookbar = this.shouldUseNotebookbarMode();
 		if (enableNotebookbar && !window.mode.isMobile()) {
 			if (e.detail.perm === 'edit') {
-				if (this.map.menubar) {
-					this.map.removeControl(this.map.menubar);
-					this.map.menubar = null;
+				this.removeClassicUI();
+				// Avoid re-refreshing the notebookbar if it is already initialized.
+				// `addNotebookbarUI()` triggers a full refresh (remove + re-add), which temporarily
+				if (!this.isNotebookbarInitialized()) {
+					this.makeSpaceForNotebookbar();
+					this.addNotebookbarUI();
+				} else {
+					// Still refresh command values when switching back to edit.
+					this.map.sendInitNotebookbarCommands();
 				}
-				this.makeSpaceForNotebookbar();
 			} else if (e.detail.perm === 'readonly') {
-				if (!this.map.menubar) {
-					var menubar = new Menubar();
-					this.map.menubar = menubar;
-					this.map.addControl(menubar);
+				if (this.map.sidebar && this.map.sidebar.isVisible()) {
+					this.map.sidebar.closeSidebar();
+					app.socket.sendMessage('uno .uno:SidebarHide');
 				}
-
-				if (this.notebookbar && $('#mobile-edit-button').is(':hidden')) {
-					this.notebookbar.onRemove();
-				}
+				this.removeNotebookbarUI();
+				this.addClassicUI();
 			} else {
 				app.socket.sendMessage('uno .uno:SidebarHide');
 			}
 		}
-		this.updateReadonlyIndicator();
 	}
 
-	/**
-	 * Updates visibility of the Read-only badge/button in the top toolbar.
-	*/
-	updateReadonlyIndicator(): void {
-		app.layoutingService.appendLayoutingTask(() =>{
-			if (!this.topReadonlyBtn)
-				return;
-
-			if (app.isReadOnly()) {
-				this.topReadonlyBtn.classList.remove('hidden');
-			} else {
-				this.topReadonlyBtn.classList.add('hidden');
-			}
-		})
-	}
 
 	refreshTheme(): void {
 		if (typeof window.initializedUI === 'function') {
@@ -1639,8 +1649,11 @@ class UIManager extends window.L.Control {
 	 */
 	showDocumentTooltip(tooltipInfo: any): void {
 		var split = tooltipInfo.rectangle.split(',');
-		var latlng = this.map._docLayer._twipsToLatLng(new cool.Point(+split[0], +split[1]));
-		var pt = this.map.latLngToContainerPoint(latlng);
+
+		// Go via SimplePoint(), which is aware of the active layout.
+		const point = new cool.SimplePoint(+split[0], +split[1]);
+		const pt = { x: Math.round(point.vX / app.dpiScale), y: Math.round(point.vY / app.dpiScale) };
+
 		var elem = $('.leaflet-layer');
 
 		elem.tooltip();
@@ -1676,11 +1689,11 @@ class UIManager extends window.L.Control {
 	 */
 	showSnackbar(
 		label: string,
-		action: string,
-		callback: any,
-		timeout: number,
-		hasProgress: boolean,
-		withDismiss: boolean,
+		action?: string | null,
+		callback?: any,
+		timeout?: number,
+		hasProgress?: boolean,
+		withDismiss?: boolean,
 	): void {
 		JSDialog.SnackbarController.showSnackbar(label, action, callback, timeout, hasProgress, withDismiss);
 	}
@@ -1835,7 +1848,7 @@ class UIManager extends window.L.Control {
 		id: string,
 		title: string | undefined,
 		message1: string,
-		message2: string,
+		message2: string | null,
 		buttonText: string,
 		callback: any = null,
 		withCancel: boolean = false,
@@ -2362,5 +2375,10 @@ class UIManager extends window.L.Control {
 	getBooleanDocTypePref(name: string, defaultValue: boolean = false): boolean {
 		const docType = this.map.getDocType();
 		return window.prefs.getBoolean(`${docType}.${name}`, defaultValue);
+	}
+
+	getStartCompareChanges(): boolean {
+		const compareChangesOption = window.coolParams.get('comparechanges');
+		return compareChangesOption === 'true' || compareChangesOption === '1';
 	}
 }

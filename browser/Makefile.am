@@ -19,15 +19,13 @@ else
 L10N_IOS_ALL_JS = $(DIST_FOLDER)/l10n-all.js
 L10N_JSON = $(L10N_IOS_ALL_JS)
 
-$(L10N_IOS_ALL_JS) : $(wildcard $(srcdir)/po/ui-*.po) $(shell find $(srcdir)/l10n -name '*.*') $(srcdir)/util/create-l10n-all-js.pl
-	for F in $(wildcard $(srcdir)/po/ui-*.po); do \
-		$(srcdir)/util/po2json.py $$F -o $$F.json; \
-	done
+$(L10N_IOS_ALL_JS) : $(wildcard $(srcdir)/po/ui-*.po) $(wildcard $(srcdir)/po/help-*.po) $(shell find $(srcdir)/l10n -name '*.*') $(srcdir)/util/create-l10n-all-js.pl
+	find $(srcdir)/po -name 'ui-*.po' -exec $(srcdir)/util/po2json.py {} -o {}.json \;
+	find $(srcdir)/po -name 'help-*.po' -exec $(srcdir)/util/po2json.py {} -o {}.json \;
 	@mkdir -p $(dir $@)
 	perl $(srcdir)/util/create-l10n-all-js.pl >$@
-	for F in $(wildcard $(srcdir)/po/ui-*.po); do \
-		rm $$F.json; \
-	done
+	find $(srcdir)/po -name 'ui-*.po.json' -delete
+	find $(srcdir)/po -name 'help-*.po.json' -delete
 endif
 
 QUIET_TSC = $(QUIET_TSC_$(V))
@@ -81,7 +79,7 @@ JQUERY_MINIFIED_IMAGE_PATH = node_modules/jquery-ui/themes/base/images
 JQUERY_MINIFIED_IMAGES = $(wildcard $(JQUERY_MINIFIED_IMAGE_PATH)/*.png)
 JQUERY_MINIFIED_DIST_IMAGES = $(patsubst $(JQUERY_MINIFIED_IMAGE_PATH)/%.png,$(DIST_FOLDER)/images/%.png,$(JQUERY_MINIFIED_IMAGES))
 
-COOL_IMAGES_SRC = $(shell find $(srcdir)/images \( -name '*.png' -o -name '*.svg' -o -name '*.gif' -o -name '*.cur' \))
+COOL_IMAGES_SRC = $(shell find $(srcdir)/images \( -name '*.png' -o -name '*.svg' -o -name '*.gif' \))
 COOL_IMAGES_DST = $(patsubst $(srcdir)/%,$(DIST_FOLDER)/%,$(COOL_IMAGES_SRC))
 COOL_IMAGES_CUSTOM_SRC = $(shell if test -n "$(CUSTOM_ICONS_DIRECTORY)"; then find $(CUSTOM_ICONS_DIRECTORY) -name '*.*'; fi)
 COOL_IMAGES_CUSTOM_DST = $(patsubst $(CUSTOM_ICONS_DIRECTORY)/%,$(DIST_FOLDER)/images/%,$(COOL_IMAGES_CUSTOM_SRC))
@@ -187,6 +185,7 @@ COOL_CSS_LST =\
 	$(srcdir)/css/btns.css \
 	$(srcdir)/css/notebookbar.css \
 	$(srcdir)/css/jssidebar.css \
+	$(srcdir)/css/forced-colors.css \
 	$(srcdir)/css/override-smartmenus.css \
 	$(srcdir)/css/jquery-ui-lightness.css \
 	$(srcdir)/css/infobar.css \
@@ -204,15 +203,15 @@ $(eval $(call file_targets,$(COOL_CSS)))
 WORKER_NODE_MODULES_JS =\
 	node_modules/fzstd/umd/index.js
 
-$(DIST_FOLDER)/src/layer/tile/TileWorker.js: \
-	$(srcdir)/src/layer/tile/CanvasTileWorker.js.m4 \
-	$(srcdir)/src/layer/tile/CanvasTileWorkerSrc.js \
+$(DIST_FOLDER)/src/app/TaskWorker.js: \
+	$(srcdir)/src/app/TaskWorker.js.m4 \
+	$(srcdir)/src/app/TaskWorkerSrc.js \
 	$(WORKER_NODE_MODULES_JS)
 
 	$(QUIET_M4) m4 -PE -DDEBUG=$(ENABLE_DEBUG) \
 		-DNODE_MODULES_JS=$(subst $(SPACE),$(COMMA),$(WORKER_NODE_MODULES_JS)) \
-		-DWORKER_JS=$(srcdir)/src/layer/tile/CanvasTileWorkerSrc.js \
-		$(srcdir)/src/layer/tile/CanvasTileWorker.js.m4 > $@
+		-DWORKER_JS=$(srcdir)/src/app/TaskWorkerSrc.js \
+		$(srcdir)/src/app/TaskWorker.js.m4 > $@
 
 NODE_MODULES_JS =\
 	$(if $(IS_SEPARATE),node_modules/hammerjs/hammer.js,node_modules/hammerjs/hammer.min.js) \
@@ -256,18 +255,20 @@ COOL_JS_LST =\
 	src/docdispatcher.ts \
 	src/app/DocEvents.ts \
 	src/core/geometry.ts \
+	src/core/TimerRegistry.ts \
 	src/app/GraphicSelectionMiddleware.ts \
 	src/app/TextSelectionMiddleware.ts \
 	src/app/CellSelectionMarkerMiddleware.ts \
 	src/app/TableMiddleware.ts \
 	src/app/ImpressSelectionMiddleware.ts \
 	src/app/ViewLayout.ts \
+	src/app/ViewLayoutNewBase.ts \
 	src/app/ViewLayoutWriter.ts \
 	src/app/ViewLayoutMultiPage.ts \
+	src/app/ViewLayoutCompareChanges.ts \
 	src/app/DocumentBase.ts \
 	src/app/DocumentView.ts \
 	src/app/TilesMiddleware.ts \
-	src/app/SlideshowMiddleware.ts \
 	src/app/SearchService.ts \
 	src/app/BaseClass.ts \
 	src/app/Events.ts \
@@ -281,7 +282,7 @@ COOL_JS_LST =\
 	src/app/Log.ts \
 	src/app/Debug.ts \
 	src/app/A11yValidator.ts \
-	src/app/SocketBase.ts \
+	src/app/Socket.ts \
 	src/app/TracingEvents.ts \
 	src/app/ServerCommand.ts \
 	src/Leaflet.js \
@@ -291,7 +292,6 @@ COOL_JS_LST =\
 	src/core/Util.js \
 	src/core/Class.js \
 	src/core/Events.js \
-	src/core/Socket.js \
 	src/geometry/Point.ts \
 	src/geometry/Bounds.ts \
 	src/geometry/Transformation.ts \
@@ -311,6 +311,7 @@ COOL_JS_LST =\
 	src/canvas/CanvasSectionContainer.ts \
 	src/canvas/CanvasSectionObject.ts \
 	src/canvas/sections/HTMLObjectSection.ts \
+	src/canvas/sections/CompareChangesLabelSection.ts \
 	src/canvas/sections/CommentMarkerSubSection.ts \
 	src/canvas/sections/CommentSection.ts \
 	src/canvas/sections/CommentListSection.ts \
@@ -360,6 +361,7 @@ COOL_JS_LST =\
 	src/layer/vector/CanvasOverlay.ts \
 	src/canvas/sections/ScrollSection.ts \
 	src/canvas/sections/MouseControl.ts \
+	src/app/LayerUtil.ts \
 	src/layer/tile/CanvasTileLayer.js \
 	src/layer/vector/CDarkOverlay.ts \
 	src/layer/SplitPanesContext.ts \
@@ -400,6 +402,7 @@ COOL_JS_LST =\
 	src/map/handler/Map.StateChanges.js \
 	src/map/handler/Map.WOPI.js \
 	src/control/jsdialog/Util.UniqueId.ts \
+	src/control/jsdialog/Definitions.MenuCommands.ts \
 	src/control/Control.AboutDialog.ts \
 	src/control/Control.Toolbar.js \
 	src/control/Control.Command.js \
@@ -435,11 +438,12 @@ COOL_JS_LST =\
 	src/control/jsdialog/Definitions.DialogModification.ts \
 	src/control/jsdialog/Definitions.WindowId.ts \
 	src/control/jsdialog/Util.Accessibility.ts \
-	src/control/jsdialog/Util.Dropdown.js \
+	src/control/jsdialog/Util.Dropdown.ts \
 	src/control/jsdialog/Util.Events.ts \
 	src/control/jsdialog/Util.KeyboardTabNavigation.ts \
 	src/control/jsdialog/Util.KeyboardGridNavigation.ts \
 	src/control/jsdialog/Util.KeyboardListNavigation.ts \
+	src/control/jsdialog/Util.KeyboardRadioGroupNavigation.ts \
 	src/control/jsdialog/Util.FocusCycle.js \
 	src/control/jsdialog/Util.FormulaBarSelectionHandle.ts \
 	src/control/jsdialog/Util.MessageRouter.ts \
@@ -467,6 +471,7 @@ COOL_JS_LST =\
 	src/control/jsdialog/Widget.IconView.ts \
 	src/control/jsdialog/Widget.NotebookbarIconView.ts \
 	src/control/jsdialog/Widget.MenuButton.js \
+	src/control/jsdialog/Widget.Listbox.ts \
 	src/control/jsdialog/Widget.MobileBorderSelector.js \
 	src/control/jsdialog/Widget.MobileTabControl.js \
 	src/control/jsdialog/Widget.MultilineEdit.js \
@@ -478,6 +483,7 @@ COOL_JS_LST =\
 	src/control/jsdialog/Widget.ScrolledWindow.js \
 	src/control/jsdialog/Widget.SearchEdit.ts \
 	src/control/jsdialog/Widget.SidebarContainers.ts \
+	src/control/jsdialog/Widget.Toolitem.ts \
 	src/control/jsdialog/Widget.Text.ts \
 	src/control/jsdialog/Widget.Timefield.js \
 	src/control/jsdialog/Widget.TreeView.ts \
@@ -532,6 +538,7 @@ COOL_JS_LST =\
 	src/control/Ruler.ts \
 	src/control/VRuler.ts \
 	src/control/HRuler.ts \
+	src/control/PermissionMode.ts \
 	src/slideshow/SlideCache.ts \
 	src/slideshow/SlideCompositor.ts \
 	src/slideshow/LayerRenderer.ts \
@@ -540,6 +547,7 @@ COOL_JS_LST =\
 	src/slideshow/RenderContext.ts \
 	src/slideshow/VideoRenderer.ts \
 	src/slideshow/SlideRenderer.ts \
+	src/slideshow/SlideshowMiddleware.ts \
 	src/slideshow/SlideShowPresenter.ts \
 	src/slideshow/PresenterConsole.js \
 	src/slideshow/SimpleTextureRenderer.ts \
@@ -654,7 +662,7 @@ COOL_TS_SRC = $(filter %.ts,$(COOL_JS_WEBORDER))
 
 # beware these are not helpfully ordered
 COOL_TS_JS_DST = $(patsubst src/%.ts,$(DIST_FOLDER)/src/%.js,$(COOL_TS_SRC))
-COOL_JS_DST = $(patsubst src/%.js,$(DIST_FOLDER)/src/%.js,$(COOL_JS_SRC)) $(COOL_TS_JS_DST) $(DIST_FOLDER)/src/layer/tile/TileWorker.js
+COOL_JS_DST = $(patsubst src/%.js,$(DIST_FOLDER)/src/%.js,$(COOL_JS_SRC)) $(COOL_TS_JS_DST) $(DIST_FOLDER)/src/app/TaskWorker.js
 # should be no lingering / obsolete files:
 COOL_ASSERT_INTERSECT = $(filter $(COOL_JS_SRC), $(patsubst %.ts,%.js,$(COOL_TS_SRC)))
 
@@ -664,9 +672,22 @@ SPACE := $(EMPTY) $(EMPTY)
 COOL_VERSION = $(shell cd $(srcdir) && git log -1 --format=%h --abbrev=10)
 INTERMEDIATE_DIR ?= $(if $(IS_SEPARATE),$(abs_builddir)/debug,$(abs_builddir)/release)
 
-EXTRA_DIST = $(shell find . -type f -not -path './.git/*' -not -path './node_modules/*' -not -path './l10n/*' -not -path './images/*' | sed 's/.\///')
+# Don't use EXTRA_DIST with $(shell find) as it causes "Argument list too long" errors
+# Instead, use dist-hook to copy files
+EXTRA_DIST =
 
-SUBDIRS = . l10n images
+dist-hook:
+	cd $(srcdir) && find . -type f \
+		-not -path './.git/*' \
+		-not -path './node_modules/*' \
+		-not -path './l10n/*' \
+		-not -path './images/*' \
+		-not -path './dist/*' \
+		-not -path './debug/*' \
+		-not -path './release/*' \
+		-exec cp -p --parents {} $(distdir) \;
+
+SUBDIRS = l10n images
 
 COOL_JS_BUNDLE = $(patsubst %.ts,%.js,$(COOL_JS_WEBORDER))
 
@@ -886,8 +907,10 @@ $(DIST_FOLDER)/global.js: $(srcdir)/js/global.js
 	$(call global_file)
 
 $(INTERMEDIATE_DIR)/COOL_JS.m4.jslist: $(COOL_JS_DST)
-	$(QUIET_ECHO) echo $(COOL_JS_DST) > $(INTERMEDIATE_DIR)/COOL_JS.m4.jslist.tmp
-	$(QUIET_CMP) if cmp -s $(INTERMEDIATE_DIR)/COOL_JS.m4.jslist.tmp $(INTERMEDIATE_DIR)/COOL_JS.m4.jslist; then rm $(INTERMEDIATE_DIR)/COOL_JS.m4.jslist.tmp; else mv $(INTERMEDIATE_DIR)/COOL_JS.m4.jslist.tmp $(INTERMEDIATE_DIR)/COOL_JS.m4.jslist; fi
+	@mkdir -p $(INTERMEDIATE_DIR)
+	@rm -f $@.tmp
+	@for file in $^; do echo "$$file" >> $@.tmp; done
+	$(QUIET_CMP) if cmp -s $@.tmp $@; then rm $@.tmp; else mv $@.tmp $@; fi
 
 $(INTERMEDIATE_DIR)/COOL_JS.m4: $(INTERMEDIATE_DIR)/COOL_JS.m4.jslist
 	$(foreach file,$(NODE_MODULES_JS) $(COOL_LIBS_JS) $(patsubst %.ts,%.js,$(COOL_JS_WEBORDER)), $(shell echo -n $(file), >> $(INTERMEDIATE_DIR)/COOL_JS.m4.tmp))
@@ -915,9 +938,16 @@ $(DIST_FOLDER)/cool.html: $(srcdir)/html/cool.html.m4 \
 		-DVENDOR="$(VENDOR)" \
 		$(srcdir)/html/cool.html.m4 > $@
 
-node_modules: package.json archived-packages
-	@npm install
+node_modules: package.json node_shrinkpack
+	@UV_USE_IO_URING=0 npm ci --offline
 	@touch node_modules
+
+update-shrinkpack:
+	npm update
+	npm shrinkwrap
+	npx shrinkpack
+	cp npm-shrinkwrap.json npm-shrinkwrap.json.in
+	@echo "Done. Remember to commit node_shrinkpack/ and npm-shrinkwrap.json.in"
 
 $(DIST_FOLDER)/device-%.css: $(srcdir)/css/device-%.css
 	@mkdir -p $(dir $@)
@@ -1056,9 +1086,10 @@ endif
 install-data-hook:
 	mkdir -p $(DESTDIR)$(pkgdatadir)/browser
 	rsync -a $(EXCLUDES) dist $(DESTDIR)$(pkgdatadir)/browser/
+	mkdir -p $(DESTDIR)$(pkgdatadir)/browser/dist/src/app
 	mkdir -p $(DESTDIR)$(pkgdatadir)/browser/dist/src/layer/tile
 	cp -a dist/src/layer/tile/CanvasTileUtils.js $(DESTDIR)$(pkgdatadir)/browser/dist/src/layer/tile/CanvasTileUtils.js
-	cp -a dist/src/layer/tile/TileWorker.js $(DESTDIR)$(pkgdatadir)/browser/dist/src/layer/tile/TileWorker.js
+	cp -a dist/src/app/TaskWorker.js $(DESTDIR)$(pkgdatadir)/browser/dist/src/app/TaskWorker.js
 	$(WASM_BROTLI_CMD)
 endif
 
@@ -1084,12 +1115,14 @@ pot:
 		src/app/IconUtil.ts \
 		src/canvas/sections/CommentListSection.ts \
 		src/canvas/sections/CommentSection.ts \
+		src/canvas/sections/CompareChangesLabelSection.ts \
 		src/canvas/sections/ShapeHandlesSection.ts \
 		src/canvas/sections/URLPopUpSection.ts \
 		src/canvas/sections/TableInsertMarkerSection.ts \
 		src/canvas/sections/GenericButtonSection.ts \
 		src/canvas/sections/ChartContextButtonSection.ts \
 		src/canvas/sections/DiagramButtonSection.ts \
+		src/control/jsdialog/Definitions.MenuCommands.ts \
 		src/control/ColorPicker.ts \
 		src/control/Control.AboutDialog.ts \
 		src/control/Control.AddressInputField.ts \
@@ -1144,6 +1177,7 @@ pot:
 		src/control/Signing.js \
 		src/control/Toolbar.js \
 		src/control/VRuler.ts \
+		src/control/PermissionMode.ts \
 		src/control/jsdialog/Definitions.Menu.ts \
 		src/control/jsdialog/Util.SnackbarController.ts \
 		src/control/jsdialog/Widget.ColorPicker.ts \
@@ -1155,10 +1189,9 @@ pot:
 		src/control/jsdialog/Widget.RadioButton.ts \
 		src/control/jsdialog/Widget.SidebarContainers.ts \
 		src/control/jsdialog/Widget.TreeView.ts \
-		src/app/SocketBase.ts \
+		src/app/Socket.ts \
 		src/app/TracingEvents.ts \
 		src/app/ServerCommand.ts \
-		src/core/Socket.js \
 		src/docdispatcher.ts \
 		src/docstate.ts \
 		src/docstatefunctions.js \

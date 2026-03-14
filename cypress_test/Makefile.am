@@ -72,6 +72,7 @@ ALLOWED_PORTS = $(if $(findstring php-proxy, $(CYPRESS_INTEGRATION)),$(PHP_PROXY
 			$(if $(findstring nextcloud, $(CYPRESS_INTEGRATION)),$(NEXTCLOUD_PORT),$(shell seq 9900 1 9980)))
 
 KILL_COMMAND=$(if $(coolwsd),true,pkill -F $(PID_FILE) || pkill --signal SIGKILL -F $(PID_FILE))
+LOAD_PID_FILE=$(abs_builddir)/workdir/load.pids
 PARALLEL_BUILD = $(findstring -j,$(MAKEFLAGS))
 DISPLAY_NUMBER = 100
 HEADLESS_BUILD := $(findstring Command failed,$(shell xhost > /dev/null 2>&1 || echo "Command failed, so we are in a headless environment."))
@@ -264,7 +265,7 @@ NODE_BINS = \
 $(NODE_BINS): $(NPM_INSTALLED);
 
 $(NPM_INSTALLED): package.json eslint_plugin/index.js eslint_plugin/package.json
-	$(V)npm install
+	$(V)UV_USE_IO_URING=0 npm install --no-audit
 	$(V)echo node_modules:
 	$(V)ls node_modules
 	$(V)mkdir -p $(dir $(NPM_INSTALLED))
@@ -553,7 +554,11 @@ MULTIUSER_ENV = \
 # Parameters:
 # 1 - +env (optional):	additional env variables (will be appended to $(MULTIUSER_ENV).
 define run_all_multiuser_tests
-	$(foreach test,$(MULTIUSER_TEST_FILES),$(call run_multiuser_test,$(test),$(1)))
+	$(V)echo "Running cypress multi-user tests..."
+	$(V)echo
+	$(eval ENV_EXTENDED=$(MULTIUSER_ENV)$(if $(1),$(COMMA)$(1)))
+	$(call run_test_headless,\
+		$(MULTIUSER_CONFIG),$(ENV_EXTENDED),)
 endef
 
 # Run one multiuser test / all multiuser tests in interactive test runner.
@@ -766,7 +771,7 @@ do-run-cov: @JAILS_PATH@ @CACHE_PATH@ $(NODE_BINS)
 	$(V)echo
 	rm -rf .nyc_output
 	rm -rf coverage
-	npm install @cypress/code-coverage --no-save
+	UV_USE_IO_URING=0 npm install @cypress/code-coverage --no-save
 	$(V)echo "import '@cypress/code-coverage/support';" >> $(SUPPORT_FILE_ABS)
 	$(V)echo "" >> $(SUPPORT_FILE_ABS)
 	cd .. && npx nyc instrument --compact=false browser/src browser/dist/src && cd cypress_test
@@ -840,6 +845,22 @@ define run_test_parallel
 		--config-file $(CYPRESS_CONFIG)
 endef
 
+# Shell commands for CPU load generation (expanded conditionally based on ENABLE_CPULOAD)
+LOAD_START_CMD = $(if $(ENABLE_CPULOAD),\
+	echo "Starting CPU load generators..."; \
+	rm -f $(LOAD_PID_FILE); \
+	for i in $$(seq 1 $$(nproc)); do \
+		(while true; do :; done) & echo $$! >> $(LOAD_PID_FILE); \
+	done; \
+	echo "Load generators started";)
+LOAD_STOP_CMD = $(if $(ENABLE_CPULOAD),\
+	echo "Stopping CPU load generators..."; \
+	if [ -f $(LOAD_PID_FILE) ]; then \
+		while read pid; do kill $$pid 2>/dev/null || true; done < $(LOAD_PID_FILE); \
+		rm -f $(LOAD_PID_FILE); \
+	fi; \
+	echo "Load generators stopped";)
+
 # Run one test \ tests in headless mode.
 #
 # Parameters:
@@ -848,14 +869,15 @@ endef
 # 3 - env:		 list of environment variables (e.g. cypress' --env argument).
 # 4 - spec (optional):   test file path (e.g. cypress' --spec argument)
 define run_test_headless
+	$(LOAD_START_CMD) \
 	$(CYPRESS_BINARY) run \
 		--browser $(BROWSER) \
 		--headless \
 		--config-file $(CYPRESS_CONFIG) \
 		--config $(1) \
 		--env $(2) \
-		$(if $(3),--spec=$(3)) \
-		|| ($(KILL_COMMAND) && false)
+		$(if $(3),--spec=$(3)); \
+		rc=$$?; $(LOAD_STOP_CMD) $(KILL_COMMAND) || true; exit $$rc
 endef
 
 # Checks whether the given spec file exists.

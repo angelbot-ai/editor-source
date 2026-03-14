@@ -316,6 +316,19 @@ class HRuler extends Ruler {
 			this,
 		);
 
+		this._rTSContainer.ondblclick = (e) => {
+			const offset = this._rTSContainer.getBoundingClientRect().left;
+
+			var position = this._map._docLayer._pixelsToTwips({
+				x: e.clientX - offset,
+				y: 0,
+			}).x;
+
+			this.currentPositionInTwips = position;
+
+			this._insertTabstop();
+		};
+
 		this._hammer = new Hammer(this._rTSContainer);
 		this._hammer.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
 		this._hammer.get('press').set({
@@ -797,8 +810,8 @@ class HRuler extends Ruler {
 		}
 	}
 
-	_fixOffset() {
-		if (!this._map.options.docBounds) return;
+	protected _fixOffsetImpl(): void {
+		if (!app.activeDocument || app.activeDocument.fileSize.x === 0) return;
 
 		const rulerOffset =
 			-app.activeDocument.activeLayout.viewedRectangle.cX1 +

@@ -163,15 +163,22 @@ nav [id^='save'].saved img,
 	padding-left: var(--btn-img-size) !important;
 }
 
-html:not([data-theme='dark']) .unoSave.savemodified .unobutton img,
-html:not([data-theme='dark']) .savemodified.unotoolbutton .unobutton img {
+html:not([data-theme='dark']) .unoSave.savemodified .unobutton img {
 	background: url('images/lc_savemodified.svg') no-repeat center;
 }
 
-html[data-theme='dark'] .unoSave.savemodified .unobutton img,
-html[data-theme='dark'] .savemodified.unotoolbutton .unobutton img {
+html:not([data-theme='dark']) .savemodified.unotoolbutton:not(.notebookbar) .unobutton img {
+	background: url('images/compact_savemodified.svg') no-repeat center;
+}
+
+html[data-theme='dark'] .unoSave.savemodified .unobutton img {
 	background: url('images/dark/lc_savemodified.svg') no-repeat center;
 }
+
+html[data-theme='dark'] .savemodified.unotoolbutton:not(.notebookbar) .unobutton img {
+	background: url('images/dark/compact_savemodified.svg') no-repeat center;
+}
+
 
 .notebookbar-shortcuts-bar .notebookbar.unotoolbutton {
 	margin: 0px !important;
@@ -264,7 +271,7 @@ html[data-theme='dark'] .savemodified.unotoolbutton .unobutton img {
 	color: var(--color-main-text);
 }
 
-/* Curve isn't in a vertical notebookbar, so it's center-aligned by default instead of top-aligned. 
+/* Curve isn't in a vertical notebookbar, so it's center-aligned by default instead of top-aligned.
 	This rule ensures it aligns to the top. */
 .horizontal.notebookbar #insert-illustrations.ui-overflow-group .ui-overflow-group-content,
 .horizontal.notebookbar #insert-illustrations.ui-overflow-group .top-row-overflow-group {
@@ -351,6 +358,12 @@ html[data-theme='dark'] .savemodified.unotoolbutton .unobutton img {
 label.notebookbar.ui-checkbox-label {
 	font-family: var(--cool-font);
 	font-size: var(--header-font-size);
+	white-space: nowrap;
+	padding-left: 0;
+}
+
+.notebookbar #table-style-options #chk_filter_buttons2 {
+	margin-bottom: 23px;
 }
 
 #table-HomeTab .unospan-uptoolbar:not(.disabled) {
@@ -468,7 +481,8 @@ label.notebookbar.ui-checkbox-label {
 /* Styles preview */
 .jsdialog #stylesview:not(.sidebar),
 .jsdialog #masterpageall_icons:not(.sidebar),
-.jsdialog #transitions_icons:not(.sidebar) {
+.jsdialog #transitions_icons:not(.sidebar),
+.jsdialog #iconview_theme_colors:not(.sidebar) {
 	height: auto !important;
 	min-height: 64px !important;
 	border: none !important;
@@ -522,6 +536,7 @@ label.notebookbar.ui-checkbox-label {
 .notebookbar #stylesview-iconview,
 .notebookbar #masterpageall_icons-iconview,
 .notebookbar #transitions_icons-iconview,
+.notebookbar #iconview_theme_colors-iconview,
 #custom_animation_list,
 #effect_list {
 	height: var(--notebookbar-element-height);
@@ -562,12 +577,22 @@ label.notebookbar.ui-checkbox-label {
 }
 
 #masterpageall_icons-dropdown,
-#stylesview-dropdown {
+#stylesview-dropdown,
+#iconview_theme_colors-dropdown {
 	margin-top: 37px !important;
 }
 
 #transitions_icons-dropdown {
 	margin-top: 42px !important;
+}
+
+.jsdialog#iconview_theme_colors:not(.sidebar) {
+	gap: 8px !important;
+	padding: 8px 0 !important;
+}
+
+#iconview_theme_colors:not(.sidebar) .ui-iconview-entry img {
+	border: 1px solid transparent;
 }
 
 #stylesview:hover {

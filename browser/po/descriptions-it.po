@@ -1,10 +1,10 @@
-# Giovanni Montini <service@giovannimontini.com>, 2024.
+# Giovanni Montini <service@giovannimontini.com>, 2024, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-17 08:08+0200\n"
-"PO-Revision-Date: 2024-12-14 09:00+0000\n"
+"POT-Creation-Date: 2026-02-13 19:20+0200\n"
+"PO-Revision-Date: 2026-02-03 12:04+0000\n"
 "Last-Translator: Giovanni Montini <service@giovannimontini.com>\n"
 "Language-Team: Italian <https://hosted.weblate.org/projects/collabora-online/"
 "app-store-descriptions/it/>\n"

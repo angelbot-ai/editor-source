@@ -137,8 +137,10 @@ export class ScrollSection extends CanvasSectionObject {
 	}
 
 	public cancelAutoScroll(): void {
-		clearInterval(this.autoScrollTimer);
-		this.autoScrollTimer = null;
+		if (this.autoScrollTimer !== null) {
+			app.timerRegistry.clearInterval(this.autoScrollTimer);
+			this.autoScrollTimer = null;
+		}
 		this.map.isAutoScrolling = false;
 	}
 
@@ -147,9 +149,9 @@ export class ScrollSection extends CanvasSectionObject {
 		if (e.vx === 0 && e.vy === 0) {
 			this.cancelAutoScroll();
 		} else {
-			clearInterval(this.autoScrollTimer);
+			this.cancelAutoScroll();
 			this.map.isAutoScrolling = true;
-			this.autoScrollTimer = setInterval(window.L.bind(function() {
+			this.autoScrollTimer = app.timerRegistry.setInterval('autoscroll', window.L.bind(function() {
 				this.onScrollBy({x: e.vx, y: e.vy});
 			}, this), 100);
 		}
@@ -284,7 +286,7 @@ export class ScrollSection extends CanvasSectionObject {
 		var startY = this.size[1] - this.sectionProperties.scrollBarThickness - scrollProps.edgeOffset;
 
 		const sizeX = scrollProps.horizontalScrollSize - this.sectionProperties.scrollBarThickness;
-		const docWidth: number = this.map.getPixelBoundsCore().getSize().x;
+		const docWidth: number = app.sectionContainer.getWidth();
 		const startX = this.isRTL() ? docWidth - scrollProps.startX - sizeX : scrollProps.startX;
 
 		if (this.sectionProperties.drawScrollBarRailway) {
@@ -512,10 +514,10 @@ export class ScrollSection extends CanvasSectionObject {
 		if (app.activeDocument.activeLayout.canScrollHorizontal(documentAnchor)) {
 			if ((<any>window).mode.isDesktop() || this.sectionProperties.mouseIsOnHorizontalScrollBar)
 				this.showHorizontalScrollBar();
-			else
+			else if (this.sectionProperties.drawHorizontalScrollBar === true)
 				this.hideHorizontalScrollBar();
 		}
-		else this.hideHorizontalScrollBar();
+		else if (this.sectionProperties.drawHorizontalScrollBar === true) this.hideHorizontalScrollBar();
 
 		temp = point.pX >= this.size[0] - scrollProps.usableThickness;
 		temp = temp && (!mirrorX && point.pX >= this.size[0] - scrollProps.usableThickness) || (mirrorX && point.pX <= scrollProps.usableThickness);
@@ -607,7 +609,7 @@ export class ScrollSection extends CanvasSectionObject {
 		}
 
 		const sizeX = scrollProps.scrollSize - this.sectionProperties.scrollBarThickness;
-		const docWidth: number = this.map.getPixelBoundsCore().getSize().x;
+		const docWidth: number =  app.sectionContainer.getWidth();
 		const startX = this.isRTL() ? docWidth - scrollProps.startX - sizeX : scrollProps.startX;
 		const endX = startX + sizeX;
 
@@ -724,7 +726,7 @@ export class ScrollSection extends CanvasSectionObject {
 		window.L.DomUtil.addClass(document.documentElement, 'prevent-select');
 		const scrollProps: ScrollProperties = app.activeDocument.activeLayout.scrollProperties;
 		const sizeX = scrollProps.horizontalScrollSize - this.sectionProperties.scrollBarThickness;
-		const docWidth: number = this.map.getPixelBoundsCore().getSize().x;
+		const docWidth: number = app.sectionContainer.getWidth();
 		const startX = this.isRTL() ? docWidth - scrollProps.startX - sizeX : scrollProps.startX;
 
 		if (this.stepByStepScrolling) {

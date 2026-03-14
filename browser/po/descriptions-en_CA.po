@@ -1,11 +1,11 @@
 # Darshan Upadhyay <darshan.upadhyay1188@gmail.com>, 2025.
-# Rob Pearson <rob.dunedin@gmail.com>, 2025.
+# Rob Pearson <rob.dunedin@gmail.com>, 2025, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-17 08:08+0200\n"
-"PO-Revision-Date: 2025-10-31 11:23+0000\n"
+"POT-Creation-Date: 2026-02-13 19:20+0200\n"
+"PO-Revision-Date: 2026-02-03 12:17+0000\n"
 "Last-Translator: Rob Pearson <rob.dunedin@gmail.com>\n"
 "Language-Team: English (Canada) <https://hosted.weblate.org/projects/"
 "collabora-online/app-store-descriptions/en_CA/>\n"

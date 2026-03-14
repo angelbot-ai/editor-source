@@ -16,6 +16,7 @@
 #include <config.h>
 
 #include <common/Anonymizer.hpp>
+#include <wsd/TileDesc.hpp>
 
 #include <csignal>
 #include <limits>
@@ -150,7 +151,7 @@ int getCurrentThreadCount()
 
 #endif
 
-_LibreOfficeKit* loKitPtr = nullptr;
+LibreOfficeKit* loKitPtr = nullptr;
 
 static bool EnableWebsocketURP = false;
 #if !MOBILEAPP
@@ -2411,20 +2412,20 @@ bool Document::forwardToChild(const std::string_view prefix, const std::vector<c
 TilePrioritizer::Priority Document::getTilePriority(const TileDesc &desc) const
 {
     TilePrioritizer::Priority maxPrio = TilePrioritizer::Priority::NONE;
+    const auto canonicalViewId = desc.getCanonicalViewId();
 
     assert(_sessions.size() > 0);
-    for (const auto& it : _sessions)
+    for (const auto& [sessionName, session] : _sessions)
     {
-        const std::shared_ptr<ChildSession> &session = it.second;
-
         // only interested in sessions that match our viewId
-        if (session->getCanonicalViewId() != desc.getCanonicalViewId())
+        if (session->getCanonicalViewId() != canonicalViewId)
             continue;
 
         maxPrio = std::max(maxPrio, session->getTilePriority(desc));
     }
+
     if (maxPrio == TilePrioritizer::Priority::NONE)
-        LOG_WRN("No sessions match this viewId " << desc.getCanonicalViewId());
+        LOG_WRN("No sessions match this viewId " << canonicalViewId);
     // LOG_TRC("Priority for tile " << desc.generateID() << " is " << maxPrio);
     return maxPrio;
 }
@@ -3863,8 +3864,8 @@ void lokit_main(
         }
         if (queryVersion)
         {
-            char* versionInfo = loKit->getVersionInfo();
-            std::string versionString(versionInfo);
+            LOKitHelper::ScopedString versionInfo(loKit->getVersionInfo());
+            std::string versionString(versionInfo.get());
             if (displayVersion)
                 std::cout << "office version details: " << versionString << std::endl;
 
@@ -3901,7 +3902,6 @@ void lokit_main(
             Poco::URI::encode(versionString, "?#/", encodedVersion);
             pathAndQuery.append("&version=");
             pathAndQuery.append(encodedVersion);
-            free(versionInfo);
         }
 
         // Admin settings bits:
@@ -3910,7 +3910,9 @@ void lokit_main(
                             (hasSeccomp ? "ok" : "none"));
         // Are we bind mounting ?
         pathAndQuery.append(std::string("&adms_bindmounted=") +
-                            (JailUtil::isBindMountingEnabled() ? "ok" : "slow"));
+                            (!JailUtil::isBindMountingConfigured()
+                                 ? "not_recommended"
+                                 : (JailUtil::isBindMountingEnabled() ? "ok" : "slow")));
         // Are we using a container - either chroot or namespace ?
         pathAndQuery.append(std::string("&adms_contained=") +
                             (ChildSession::NoCapsForKit ? "uncontained" : "ok"));

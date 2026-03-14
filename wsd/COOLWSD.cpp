@@ -52,7 +52,6 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include <regex>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -86,8 +85,10 @@
 #include <wsd/COOLWSDServer.hpp>
 #include <wsd/DocumentBroker.hpp>
 #include <wsd/Process.hpp>
-#include <common/JsonUtil.hpp>
 #include <common/FileUtil.hpp>
+#include <common/JailUtil.hpp>
+#include <common/JsonUtil.hpp>
+#include <common/RegexUtil.hpp>
 
 #include <common/Log.hpp>
 #include <MobileApp.hpp>
@@ -182,7 +183,7 @@ extern "C"
     void forwardSigUsr2();
 }
 
-void COOLWSD::appendAllowedHostsFrom(LayeredConfiguration& conf, const std::string& root, std::vector<std::string>& allowed)
+void COOLWSD::appendAllowedHostsFrom(const LayeredConfiguration& conf, const std::string& root, std::vector<std::string>& allowed)
 {
     for (size_t i = 0; ; ++i)
     {
@@ -224,21 +225,9 @@ std::string removeProtocolAndPort(const std::string& host)
 
     return result;
 }
-
-bool isValidRegex(const std::string& expression)
-{
-    try
-    {
-        std::regex regex(expression);
-        return true;
-    }
-    catch (const std::regex_error& e) {}
-
-    return false;
-}
 }
 
-void COOLWSD::appendAllowedAliasGroups(LayeredConfiguration& conf, std::vector<std::string>& allowed)
+void COOLWSD::appendAllowedAliasGroups(const LayeredConfiguration& conf, std::vector<std::string>& allowed)
 {
     for (size_t i = 0;; i++)
     {
@@ -423,7 +412,7 @@ SubForKitMap::iterator dropSubForKit(SubForKitMap::iterator it)
     LastSubForKitBrokerExitTimes.erase(configId);
     OutstandingForks.erase(configId);
     it = SubForKitProcs.erase(it);
-    UnitWSD::get().killSubForKit(configId);
+    UNITWSD_CALL(killSubForKit(configId));
 
     return it;
 }
@@ -782,6 +771,8 @@ std::string COOLWSD::FileServerRoot;
 std::string COOLWSD::ServiceRoot;
 std::string COOLWSD::TmpFontDir;
 std::string COOLWSD::LOKitVersion;
+std::string COOLWSD::LOKitVersionNumber;
+std::string COOLWSD::LOKitVersionHash;
 std::string COOLWSD::ConfigFile = COOLWSD_CONFIGDIR "/coolwsd.xml";
 std::string COOLWSD::ConfigDir = COOLWSD_CONFIGDIR "/conf.d";
 bool COOLWSD::EnableTraceEventLogging = false;
@@ -1149,21 +1140,21 @@ void ForKitProcWSHandler::handleMessage(const std::vector<char> &data)
             {
                 LOG_INF(segFaultcount << " coolkit processes crashed with segmentation fault.");
                 SigUtil::addActivity("coolkit(s) crashed");
-                UnitWSD::get().kitSegfault(segFaultcount);
+                UNITWSD_CALL(kitSegfault(segFaultcount));
             }
 
             if (killedCount)
             {
                 LOG_INF(killedCount << " coolkit processes killed.");
                 SigUtil::addActivity("coolkit(s) killed");
-                UnitWSD::get().kitKilled(killedCount);
+                UNITWSD_CALL(kitKilled(killedCount));
             }
 
             if (oomKilledCount)
             {
                 LOG_INF(oomKilledCount << " coolkit processes killed by oom.");
                 SigUtil::addActivity("coolkit(s) killed by oom");
-                UnitWSD::get().kitOomKilled(oomKilledCount);
+                UNITWSD_CALL(kitOomKilled(oomKilledCount));
             }
         }
         else
@@ -1189,7 +1180,7 @@ COOLWSD::~COOLWSD()
     if (UnitBase::isUnitTesting())
     {
         // We won't have a valid UnitWSD::get() when not testing.
-        UnitWSD::get().setWSD(nullptr);
+        UNITWSD_CALL(setWSD(nullptr));
     }
 }
 
@@ -1220,6 +1211,57 @@ void COOLWSD::requestTerminateSpareKits()
     }
 }
 
+// Due to the possibility of enterMountingNS failing at an intermediate stage
+// after entering a usernamespace, but unable to enter a useful mounting namespace
+// do a test mount in another separate child whose failure don't affect the parent
+bool COOLWSD::testMountingNSInFork()
+{
+    Log::preFork();
+
+    pid_t pid = fork();
+    if (!pid)
+    {
+        // Child
+        Log::postFork();
+
+        // setupChildRoot does a test bind mount + umount to see if that fully works
+        // so we have a mount namespace here just for the purposes of that test
+        LOG_DBG("Test moving into user namespace as uid 0 in level 2 child");
+
+        int ret = JailUtil::enterMountingNS(geteuid(), getegid());
+
+        LOG_DBG("Level 2 child enterMountingNS result is: " << ret);
+
+        _exit(ret);
+    }
+
+    // Parent
+
+    if (pid == -1)
+    {
+        LOG_SYS("testMountingNSInFork fork failed");
+        return false;
+    }
+
+    int wstatus;
+    const int rc = waitpid(pid, &wstatus, 0);
+    if (rc == -1)
+    {
+        LOG_SYS("testMountingNSInFork waitpid failed");
+        return false;
+    }
+
+    if (!WIFEXITED(wstatus))
+    {
+        LOG_SYS("testMountingNSInFork abnormal termination");
+        return false;
+    }
+
+    int status = WEXITSTATUS(wstatus);
+    LOG_DBG("testMountingNSInFork status: " << std::hex << status << std::dec);
+    return status == 1;
+}
+
 void COOLWSD::setupChildRoot(const bool UseMountNamespaces)
 {
     JailUtil::disableBindMounting(); // Default to assume failure
@@ -1242,8 +1284,14 @@ void COOLWSD::setupChildRoot(const bool UseMountNamespaces)
         {
             // setupChildRoot does a test bind mount + umount to see if that fully works
             // so we have a mount namespace here just for the purposes of that test
+
+            // First see if it works in (another) throw away child so a successful
+            // NEWUSER, but a failed NEWNS, or an unusable one, doesn't affect this
+            // process. So on failure we can skip the enterMountingNS at this level.
+            const bool childMountWorked = COOLWSD::testMountingNSInFork();
+
             LOG_DBG("Move into user namespace as uid 0");
-            if (JailUtil::enterMountingNS(geteuid(), getegid()))
+            if (childMountWorked && JailUtil::enterMountingNS(geteuid(), getegid()))
                 JailUtil::enableMountNamespaces();
             else
                 LOG_ERR("creating usernamespace for mount user failed.");
@@ -1293,6 +1341,10 @@ void COOLWSD::setupChildRoot(const bool UseMountNamespaces)
         JailUtil::enableBindMounting();
     if (EnableMountNamespaces)
         JailUtil::enableMountNamespaces();
+    if (ConfigUtil::getConfigValue<bool>("mount_jail_tree", true))
+        JailUtil::enableBindMountingConfigured();
+    else
+        JailUtil::disableBindMountingConfigured();
 }
 
 #endif
@@ -1530,10 +1582,10 @@ void COOLWSD::innerInitialize(Poco::Util::Application& self)
     {
         throw std::runtime_error("Failed to load wsd unit test library.");
     }
-    UnitWSD::get().setWSD(this);
+    UNITWSD_CALL(setWSD(this));
 
     // Allow UT to manipulate before using configuration values.
-    UnitWSD::get().configure(conf);
+    UNITWSD_CALL(configure(conf));
 
     // Trace Event Logging.
     EnableTraceEventLogging = ConfigUtil::getConfigValue<bool>(conf, "trace_event[@enable]", false);
@@ -2110,41 +2162,7 @@ void COOLWSD::innerInitialize(Poco::Util::Application& self)
                                                         takeSnapshot, filters);
     }
 
-    // Allowed hosts for being external data source in the documents
-    std::vector<std::string> lokAllowedHosts;
-    appendAllowedHostsFrom(conf, "net.lok_allow", lokAllowedHosts);
-    // For backward compatibility post_allow hosts are also allowed
-    bool postAllowed = conf.getBool("net.post_allow[@allow]", false);
-    if (postAllowed)
-        appendAllowedHostsFrom(conf, "net.post_allow", lokAllowedHosts);
-    // For backward compatibility wopi hosts are also allowed
-    bool wopiAllowed = conf.getBool("storage.wopi[@allow]", false);
-    if (wopiAllowed)
-    {
-        appendAllowedHostsFrom(conf, "storage.wopi", lokAllowedHosts);
-        appendAllowedAliasGroups(conf, lokAllowedHosts);
-    }
-
-    if (lokAllowedHosts.size())
-    {
-        std::string allowedRegex;
-        for (size_t i = 0; i < lokAllowedHosts.size(); i++)
-        {
-            if (isValidRegex(lokAllowedHosts[i]))
-                allowedRegex += (i != 0 ? "|" : "") + lokAllowedHosts[i];
-            else
-                LOG_ERR("Invalid regular expression for allowed host: \"" << lokAllowedHosts[i] << "\"");
-        }
-
-        setenv("LOK_HOST_ALLOWLIST", allowedRegex.c_str(), true);
-
-#if !MOBILEAPP
-        if (!ConfigUtil::getConfigValue<bool>(conf, "ssl.ssl_verification", true)) {
-            // also disable host verification for allowed hosts
-            ::setenv("LOK_HOST_ALLOWLIST_EXEMPT_VERIFY_HOST", "1", true);
-        }
-#endif
-    }
+    setLokitEnvironmentVariables(conf);
 
 #if !MOBILEAPP
     SavedClipboards = std::make_unique<ClipboardCache>();
@@ -2225,6 +2243,46 @@ void COOLWSD::innerInitialize(Poco::Util::Application& self)
 #else
     (void) self;
 #endif
+}
+
+void COOLWSD::setLokitEnvironmentVariables(const Poco::Util::LayeredConfiguration& conf)
+{
+    // Allowed hosts for being external data source in the documents
+    std::vector<std::string> lokAllowedHosts;
+    appendAllowedHostsFrom(conf, "net.lok_allow", lokAllowedHosts);
+    // For backward compatibility post_allow hosts are also allowed
+    bool postAllowed = conf.getBool("net.post_allow[@allow]", false);
+    if (postAllowed)
+        appendAllowedHostsFrom(conf, "net.post_allow", lokAllowedHosts);
+    // For backward compatibility wopi hosts are also allowed
+    bool wopiAllowed = conf.getBool("storage.wopi[@allow]", false);
+    if (wopiAllowed)
+    {
+        appendAllowedHostsFrom(conf, "storage.wopi", lokAllowedHosts);
+        appendAllowedAliasGroups(conf, lokAllowedHosts);
+    }
+
+    if (lokAllowedHosts.size())
+    {
+        std::string allowedRegex;
+        for (size_t i = 0; i < lokAllowedHosts.size(); i++)
+        {
+            if (RegexUtil::isRegexValid(lokAllowedHosts[i]))
+                allowedRegex += (i != 0 ? "|" : "") + lokAllowedHosts[i];
+            else
+                LOG_ERR("Invalid regular expression for allowed host: \"" << lokAllowedHosts[i] << "\"");
+        }
+
+        setenv("LOK_HOST_ALLOWLIST", allowedRegex.c_str(), true);
+
+#if !MOBILEAPP
+        if (!ConfigUtil::getConfigValue<bool>(conf, "ssl.ssl_verification", true))
+        {
+            // also disable host verification for allowed hosts
+            ::setenv("LOK_HOST_ALLOWLIST_EXEMPT_VERIFY_HOST", "1", true);
+        }
+#endif
+    }
 }
 
 void COOLWSD::initializeSSL()
@@ -3031,7 +3089,7 @@ private:
                     std::unique_lock<std::mutex> lock(NewChildrenMutex);
                     rebalanceChildren(configId, COOLWSD::NumPreSpawnedChildren);
 
-                    UnitWSD::get().newSubForKit(SubForKitProcs[configId], configId);
+                    UNITWSD_CALL(newSubForKit(SubForKitProcs[configId], configId));
                 }
 
                 return;
@@ -3056,7 +3114,15 @@ private:
                 else if (param.first == "configid")
                     configId = param.second;
                 else if (param.first == "version")
+                {
                     COOLWSD::LOKitVersion = param.second;
+                    Poco::JSON::Object::Ptr object;
+                    if (JsonUtil::parseJSON(COOLWSD::LOKitVersion, object))
+                    {
+                        COOLWSD::LOKitVersionNumber = JsonUtil::getJSONValue<std::string>(object, "ProductVersion") + JsonUtil::getJSONValue<std::string>(object, "ProductExtension");
+                        COOLWSD::LOKitVersionHash = JsonUtil::getJSONValue<std::string>(object, "BuildId").substr(0, 8);
+                    }
+                }
                 else if (param.first.size() > 6 &&
                          param.first.compare(0, 5, "adms_") == 0)
                     admsProps[param.first.substr(5)] = param.second;
@@ -3090,7 +3156,7 @@ private:
             auto child = std::make_shared<ChildProcess>(pid, jailId, configId, socket, request, admsProps);
 
             if constexpr (!Util::isMobileApp())
-                UnitWSD::get().newChild(child);
+                UNITWSD_CALL(newChild(child));
 
             _pid = pid;
             _socketFD = socket->getFD();
@@ -3809,7 +3875,7 @@ void COOLWSD::innerMain()
 
         if (UnitWSD::isUnitTesting() && !SigUtil::getShutdownRequestFlag())
         {
-            UnitWSD::get().invokeTest();
+            UNITWSD_CALL(invokeTest());
 
             // More frequent polling while testing, to reduce total test time.
             waitMicroS =

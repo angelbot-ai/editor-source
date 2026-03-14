@@ -16,8 +16,10 @@ function _createButtonForNotebookbarIconview(
 	id: string,
 	buttonClass: string,
 	icon: string,
+	ariaLabel: string,
 	builder: JSBuilder,
 	onClickCallback: any,
+	accessibility?: NotebookbarAccessibilityDescriptor,
 ) {
 	const container = window.L.DomUtil.create(
 		'div',
@@ -28,15 +30,30 @@ function _createButtonForNotebookbarIconview(
 	container.id = id;
 
 	// create the button
-	const button = document.createElement('button');
+	const button = window.L.DomUtil.create(
+		'button',
+		'ui-content unobutton ' + buttonClass,
+		container,
+	);
 	button.id = id + '-button';
-	button.className = 'ui-content unobutton ' + buttonClass;
-	container.appendChild(button);
-	parentContainer.appendChild(container);
+	if (accessibility?.combination) button.accessKey = accessibility?.combination;
+
+	const a11yData: WidgetJSON = {
+		id: id,
+		type: 'iconview-button',
+		aria: {
+			label: ariaLabel,
+		},
+	};
+	JSDialog.SetupA11yLabelForNonLabelableElement(button, a11yData, builder);
 
 	// add the icon
-	const buttonImage = window.L.DomUtil.create('img', '', button);
-	buttonImage.className = 'ui-iconview-button-icon';
+	const buttonImage = window.L.DomUtil.create(
+		'img',
+		'ui-iconview-button-icon',
+		button,
+	);
+	buttonImage.alt = '';
 	app.LOUtil.setImage(buttonImage, icon, builder.map);
 
 	// set the onclick callback
@@ -157,6 +174,7 @@ JSDialog.notebookbarIconView = function (
 		data.id + '-scroll-up',
 		'ui-iconview-scroll-up-button',
 		'lc_searchprev.svg',
+		_('Scroll up'),
 		builder,
 		scrollUpCallback,
 	);
@@ -166,6 +184,7 @@ JSDialog.notebookbarIconView = function (
 		data.id + '-scroll-down',
 		'ui-iconview-scroll-down-button',
 		'lc_searchnext.svg',
+		_('Scroll down'),
 		builder,
 		scrollDownCallback,
 	);
@@ -175,8 +194,10 @@ JSDialog.notebookbarIconView = function (
 		data.id + '-expand',
 		'ui-iconview-expander-button',
 		'lc_iconviewexpander.svg',
+		_('More options'),
 		builder,
 		expanderCallback,
+		{ focusBack: true, combination: 'SD', de: null },
 	);
 
 	commonContainer.appendChild(buttonsContainer);

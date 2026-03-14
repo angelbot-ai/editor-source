@@ -13,22 +13,19 @@
 
 #include <string>
 
-#include <Poco/File.h>
-#include <Poco/Path.h>
-
 namespace JailUtil
 {
 
 /// General temporary directory owned by us.
-constexpr const char CHILDROOT_TMP_PATH[] = "/tmp";
+static const std::string CHILDROOT_TMP_PATH = "/tmp";
 
 /// Files uploaded by users are stored in this sub-directory of child-root.
-constexpr const char CHILDROOT_TMP_INCOMING_PATH[] = "/tmp/incoming";
+static const std::string CHILDROOT_TMP_INCOMING_PATH = "/tmp/incoming";
 
-constexpr const char CHILDROOT_TMP_SHARED_PRESETS_PATH[] = "/tmp/sharedpresets";
+static const std::string CHILDROOT_TMP_SHARED_PRESETS_PATH = "/tmp/sharedpresets";
 
 /// The LO installation directory with jail.
-constexpr const char LO_JAIL_SUBPATH[] = "lo";
+static const std::string LO_JAIL_SUBPATH = "lo";
 
 /** Linux user/mount namespaces
 
@@ -80,6 +77,14 @@ void disableBindMounting();
 
 /// Returns true iff bind-mounting is enabled in this process.
 bool isBindMountingEnabled();
+
+/// Flag that bind-mounting is configured.
+void enableBindMountingConfigured();
+/// Unflag that bind-mounting is configured.
+void disableBindMountingConfigured();
+
+/// Returns true iff bind-mounting is configured in coolwsd.xml.
+bool isBindMountingConfigured();
 
 /// Enable namespace-mounting in this process.
 void enableMountNamespaces();

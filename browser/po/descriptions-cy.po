@@ -1,10 +1,10 @@
-# Rhoslyn Prys <rprys@posteo.net>, 2025.
+# Rhoslyn Prys <rprys@posteo.net>, 2025, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-17 08:08+0200\n"
-"PO-Revision-Date: 2025-07-18 11:04+0000\n"
+"POT-Creation-Date: 2026-02-13 19:20+0200\n"
+"PO-Revision-Date: 2026-02-03 12:59+0000\n"
 "Last-Translator: Rhoslyn Prys <rprys@posteo.net>\n"
 "Language-Team: Welsh <https://hosted.weblate.org/projects/collabora-online/"
 "app-store-descriptions/cy/>\n"

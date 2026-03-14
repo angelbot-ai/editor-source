@@ -66,6 +66,7 @@ describe(['tagdesktop'], 'Top toolbar tests.', function() {
 	it('Apply font name.', function() {
 		helper.setDummyClipboardForCopy();
 		desktopHelper.actionOnSelector('fontName', (selector) => { cy.cGet(selector).click(); });
+		cy.cGet('[id$="-dropdown"].modalpopup span').contains('Alef').scrollIntoView();
 		desktopHelper.selectFromJSDialogListbox('Alef', true);
 		refreshCopyPasteContainer();
 		helper.copy();
@@ -337,6 +338,10 @@ describe(['tagdesktop'], 'Top toolbar tests.', function() {
 		cy.cGet('#Insert-container .unoInsertObjectChart button').click();
 
 		cy.cGet('#test-div-shapeHandlesSection').should('exist');
+
+		// exit active object mode
+		helper.typeIntoDocument('{esc}');
+		helper.typeIntoDocument('{esc}');
 
 		//delete
 		helper.typeIntoDocument('{del}');

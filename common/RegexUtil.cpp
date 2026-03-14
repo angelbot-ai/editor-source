@@ -14,6 +14,7 @@
 
 #include "RegexUtil.hpp"
 
+#include <regex>
 #include <Poco/RegularExpression.h>
 
 namespace RegexUtil
@@ -113,6 +114,18 @@ std::string getValue(const std::set<std::string>& set, const std::string& subjec
     }
 
     return std::string();
+}
+
+bool isRegexValid(const std::string& regex)
+{
+    try
+    {
+        std::regex re(regex, std::regex_constants::icase);
+        return true;
+    }
+    catch (const std::regex_error&){}
+
+    return false;
 }
 
 } // namespace RegexUtil

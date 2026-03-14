@@ -17,6 +17,7 @@
 #include <common/Unit.hpp>
 #include <common/Util.hpp>
 #include <net/HttpHelper.hpp>
+#include <string_view>
 #if !MOBILEAPP
 #include <net/HttpRequest.hpp>
 #endif
@@ -703,14 +704,9 @@ public:
     }
 
     /// Sends a WebSocket Text message.
-    int sendMessage(const std::string& msg) const
+    int sendMessage(const std::string_view msg) const
     {
-        return sendTextMessage(msg.c_str(), msg.size());
-    }
-
-    template <std::size_t N> int sendMessage(const char (&msg)[N]) const
-    {
-        return sendTextMessage(msg, N - 1); // Minus the null-terminator.
+        return sendTextMessage(msg.data(), msg.size());
     }
 
     /// Implementation of the ProtocolHandlerInterface.

@@ -11,6 +11,9 @@
 
 #pragma once
 
+#include <common/StateEnum.hpp>
+#include <common/Util.hpp>
+
 #include <cerrno>
 #include <chrono>
 #include <cstddef>
@@ -27,9 +30,6 @@
 #if defined __EMSCRIPTEN__
 #include <emscripten/console.h>
 #endif
-
-#include "Util.hpp"
-#include "StateEnum.hpp"
 
 namespace Log
 {
@@ -91,16 +91,15 @@ namespace Log
     /// Generates log entry prefix. Example follows (without the vertical bars).
     /// |wsd-07272-07298 2020-04-25 17:29:28.928697 -0400 [ websrv_poll ] TRC  |
     /// This is fully signal-safe. Buffer must be at least 128 bytes.
-    char* prefix(const std::chrono::time_point<std::chrono::system_clock>& tp,
-                 char* buffer,
-                 const char* level);
+    char* prefix(const std::chrono::time_point<std::chrono::system_clock>& tp, char* buffer,
+                 const std::string_view level);
 
-    template <int Size> inline char* prefix(char buffer[Size], const char* level)
+    template <int Size>
+    inline char* prefix(std::array<char, Size>& buffer, const std::string_view level)
     {
         static_assert(Size >= 128, "Buffer size must be at least 128 bytes.");
 
-        const auto tp = std::chrono::system_clock::now();
-        return prefix(tp, buffer, level);
+        return prefix(std::chrono::system_clock::now(), buffer.data(), level);
     }
 
     /// is a certain level of logging enabled ?
@@ -186,13 +185,7 @@ static constexpr std::size_t skipPathPrefix(const char (&s)[N], std::size_t n = 
 #define LOG_FILE_NAME(f) (&f[skipPathPrefix(f)])
 #endif
 
-// Macro expansion doesn't happen when # or ## operators are used,
-// so we need an indirection to expand macros before using the result.
-#define CONCATINATE_IMPL(X, Y) X##Y
-#define CONCATINATE(X, Y) CONCATINATE_IMPL(X, Y)
 #define UNIQUE_VAR(X) CONCATINATE(X, __LINE__)
-#define STRINGIFY(X) #X
-#define STRING(X) STRINGIFY(X)
 
 #ifdef __ANDROID__
 
@@ -227,9 +220,20 @@ static constexpr std::size_t skipPathPrefix(const char (&s)[N], std::size_t n = 
         }                                       \
     } while (false)
 
+/// Logs this particular log entry only once in the process lifetime.
+#define LOG_MESSAGE_ONCE_(LVL, A, X, PREFIX, SUFFIX)                                               \
+    do                                                                                             \
+    {                                                                                              \
+        if (LOG_CONDITIONAL(LVL, A))                                                               \
+        {                                                                                          \
+            static std::once_flag UNIQUE_VAR(once);                                                \
+            std::call_once(UNIQUE_VAR(once), [&]() { LOG_BODY_(LVL, X, PREFIX, SUFFIX); });        \
+        }                                                                                          \
+    } while (false)
+
 #define LOG_BODY_(LVL, X, PREFIX, END)                                                             \
-    char UNIQUE_VAR(buffer)[1024];                                                                 \
-    std::ostringstream oss_(Log::prefix<sizeof(UNIQUE_VAR(buffer)) - 1>(UNIQUE_VAR(buffer), #LVL), \
+    std::array<char, 1024> UNIQUE_VAR(buffer);                                                     \
+    std::ostringstream oss_(Log::prefix<UNIQUE_VAR(buffer).size()>(UNIQUE_VAR(buffer), #LVL),      \
                             std::ostringstream::ate);                                              \
     PREFIX(oss_);                                                                                  \
     oss_ << std::boolalpha << X;                                                                   \
@@ -240,10 +244,9 @@ static constexpr std::size_t skipPathPrefix(const char (&s)[N], std::size_t n = 
 #define LOG_UNCONDITIONAL(LVL, X)                                                                  \
     do                                                                                             \
     {                                                                                              \
-        char UNIQUE_VAR(buffer)[1024];                                                             \
-        std::ostringstream oss_(                                                                   \
-            Log::prefix<sizeof(UNIQUE_VAR(buffer)) - 1>(UNIQUE_VAR(buffer), #LVL),                 \
-            std::ostringstream::ate);                                                              \
+        std::array<char, 1024> UNIQUE_VAR(buffer);                                                 \
+        std::ostringstream oss_(Log::prefix<UNIQUE_VAR(buffer).size()>(UNIQUE_VAR(buffer), #LVL),  \
+                                std::ostringstream::ate);                                          \
         logPrefix(oss_);                                                                           \
         oss_ << std::boolalpha << X;                                                               \
         LOG_END(oss_);                                                                             \
@@ -269,6 +272,9 @@ static constexpr std::size_t skipPathPrefix(const char (&s)[N], std::size_t n = 
 #define LOG_INF_NOFILE(X) LOGA_INF_NOFILE(Generic, X)
 #define LOG_WRN(X)        LOG_MESSAGE_(WRN, Generic, X, logPrefix, LOG_END)
 #define LOG_ERR(X)        LOG_MESSAGE_(ERR, Generic, X, logPrefix, LOG_END)
+
+#define LOG_WRN_ONCE(X) LOG_MESSAGE_ONCE_(WRN, Generic, X, logPrefix, LOG_END)
+#define LOG_ERR_ONCE(X) LOG_MESSAGE_ONCE_(ERR, Generic, X, logPrefix, LOG_END)
 
 #define LOGA_TRC(A,X)        LOG_MESSAGE_(TRC, A, X, logPrefix, LOG_END)
 #define LOGA_TRC_NOFILE(A,X) LOG_MESSAGE_(TRC, A, X, logPrefix, LOG_END_NOFILE)
@@ -334,6 +340,12 @@ static constexpr std::size_t skipPathPrefix(const char (&s)[N], std::size_t n = 
 #define LOG_INF_S(X) LOG_MESSAGE_(INF, Generic, X, (void), LOG_END)
 #define LOG_WRN_S(X) LOG_MESSAGE_(WRN, Generic, X, (void), LOG_END)
 #define LOG_ERR_S(X) LOG_MESSAGE_(ERR, Generic, X, (void), LOG_END)
+
+#define SERIALIZE(_, X) STRING(X) ": " << (X) << ", "
+
+/// Logs the given variables and their values as LOG_ANY.
+/// Example: LOG_VARS(size, name); => LOG_ANY("size: " << size << ", name: " << name << ", ");
+#define LOG_VARS(PREFIX, ...) LOG_ANY(PREFIX << FOR_EACH(SERIALIZE, NAME, __VA_ARGS__))
 
 #define LOG_CHECK(X)                                                                               \
     do                                                                                             \

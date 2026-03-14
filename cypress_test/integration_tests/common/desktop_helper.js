@@ -104,7 +104,6 @@ function selectFromJSDialogListbox(item, isImage) {
 	cy.log('>> selectFromJSDialogListbox - start');
 
 	cy.cGet('[id$="-dropdown"].modalpopup').should('be.visible');
-	// We use force because the tooltip sometimes hides the items.
 	if (isImage) {
 		cy.wait(1000); // We need some time to render custom entries
 		cy.cGet('[id$="-dropdown"].modalpopup img[alt="' + item + '"]').click();
@@ -219,6 +218,7 @@ function selectZoomLevel(zoomLevel, makeZoomVisible = true) {
 }
 
 // Reset zoom level to 100%.
+// WARN: doesn't work for writer, use fitWidthZoom for that.
 function resetZoomLevel() {
 	cy.log('>> resetZoomLevel - start');
 
@@ -227,6 +227,14 @@ function resetZoomLevel() {
 	shouldHaveZoomLevel('100');
 
 	cy.log('<< resetZoomLevel - end');
+}
+
+function fitWidthZoom() {
+	cy.log('>> fitWidthZoom - start');
+
+	cy.cGet('#toolbar-down #fitwidthzoom').click();
+
+	cy.log('<< fitWidthZoom - end');
 }
 
 function insertImage() {
@@ -507,13 +515,11 @@ function scrollWriterDocumentToTop() {
 	assertScrollbarPosition('vertical', 0, 10);
 }
 
-function scrollViewDown() {
-	cy.getFrameWindow()
-		.its('L')
-		.then(function(L) {
-			L.Map.THIS.panBy({x: 0, y: 4000});
-			updateFollowingUsers();
-		});
+function scrollViewDown(win) {
+	cy.then(function() {
+		win.L.Map.THIS.panBy({x: 0, y: 4000});
+		win.app.updateFollowingUsers();
+	});
 }
 
 function updateFollowingUsers() {
@@ -563,6 +569,26 @@ function getDropdown(dropdownId) {
 	return cy.cGet('[id^="' + dropdownId + '"].modalpopup');
 }
 
+// Undo all changes until undo is no longer possible
+function undoAll() {
+	cy.log('>> undoAll - start');
+
+	cy.getFrameWindow().then(function(win) {
+		helper.processToIdle(win);
+		cy.cGet('#Home-container .unoUndo').then(function undoStep($undo) {
+			if ($undo.attr('disabled') === undefined) {
+				cy.cGet('#Home-container .unoUndo button').click({force: true});
+				helper.processToIdle(win);
+				cy.cGet('#Home-container .unoUndo').then(undoStep);
+			}
+		});
+	});
+
+	cy.cGet('#Home-container .unoUndo').should('not.have','disabled');
+
+	cy.log('<< undoAll - end');
+}
+
 module.exports.showSidebar = showSidebar;
 module.exports.hideSidebar = hideSidebar;
 module.exports.hideSidebarImpress = hideSidebarImpress;
@@ -577,6 +603,7 @@ module.exports.zoomOut = zoomOut;
 module.exports.shouldHaveZoomLevel = shouldHaveZoomLevel;
 module.exports.selectZoomLevel = selectZoomLevel;
 module.exports.resetZoomLevel = resetZoomLevel;
+module.exports.fitWidthZoom = fitWidthZoom;
 module.exports.insertImage = insertImage;
 module.exports.insertVideo = insertVideo;
 module.exports.deleteImage = deleteImage;
@@ -601,3 +628,4 @@ module.exports.getNbIcon = getNbIcon;
 module.exports.getCompactIconArrow = getCompactIconArrow;
 module.exports.getNbIconArrow = getNbIconArrow;
 module.exports.getDropdown = getDropdown;
+module.exports.undoAll = undoAll;

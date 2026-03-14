@@ -132,6 +132,19 @@ class Dispatcher {
 			});
 		};
 
+		this.actionsMap['localcomparedocuments'] = function () {
+			window.L.DomUtil.get('comparedocuments').click();
+		};
+		this.actionsMap['remotecomparedocuments'] = function () {
+			app.map.fire('postMessage', {
+				msgId: 'UI_InsertFile',
+				args: {
+					callback: 'Action_CompareDocuments',
+					mimeTypeFilter: app.LOUtil.documentMimeFilter,
+				},
+			});
+		};
+
 		this.actionsMap['charmapcontrol'] = function () {
 			app.map.sendUnoCommand('.uno:InsertSymbol');
 		};
@@ -232,6 +245,10 @@ class Dispatcher {
 		this.actionsMap['zoomreset'] = () => {
 			app.map.setZoom(app.map.options.zoom, null, true);
 		};
+		this.actionsMap['fitwidthzoom'] = () => {
+			if (app.activeDocument.activeLayout)
+				app.activeDocument.activeLayout.adjustViewZoomLevel();
+		};
 
 		this.actionsMap['searchprev'] = () => {
 			app.searchService.searchPrevious();
@@ -317,6 +334,30 @@ class Dispatcher {
 
 		this.actionsMap['collapsenotebookbar'] = () => {
 			app.map.uiManager.collapseNotebookbar();
+		};
+
+		this.actionsMap['validatedialogsa11y'] = () => {
+			if (window.app.a11yValidator) {
+				window.app.a11yValidator.validateAllOpenDialogs();
+			} else {
+				console.warn('A11yValidator not available');
+			}
+		};
+
+		this.actionsMap['validatesidebara11y'] = () => {
+			if (window.app.a11yValidator) {
+				window.app.a11yValidator.validateSidebar();
+			} else {
+				console.warn('A11yValidator not available');
+			}
+		};
+
+		this.actionsMap['validatenotebookbara11y'] = () => {
+			if (window.app.a11yValidator) {
+				window.app.a11yValidator.validateNotebookbar();
+			} else {
+				console.warn('A11yValidator not available');
+			}
 		};
 	}
 
@@ -693,6 +734,7 @@ class Dispatcher {
 				let commandState = false;
 				if (app.activeDocument.activeLayout.type === 'ViewLayoutMultiPage') {
 					app.activeDocument.activeLayout = new ViewLayoutWriter();
+					app.activeDocument.activeLayout.adjustViewZoomLevel();
 				} else {
 					app.activeDocument.activeLayout = new ViewLayoutMultiPage();
 					commandState = true;
@@ -704,6 +746,34 @@ class Dispatcher {
 				});
 				app.activeDocument.activeLayout.sendClientVisibleArea();
 				app.sectionContainer.requestReDraw();
+			}
+		};
+
+		this.actionsMap['comparechanges'] = function () {
+			if (app.activeDocument && app.activeDocument.activeLayout) {
+				Util.ensureValue(app.activeDocument);
+				app.socket.sendMessage('uno .uno:RedlineRenderMode');
+
+				const commandState =
+					app.activeDocument.activeLayout.type === 'ViewLayoutCompareChanges';
+
+				app.map.fire('commandstatechanged', {
+					commandName: 'comparechanges',
+					state: !commandState ? 'true' : 'false',
+				});
+
+				app.activeDocument.activeLayout = commandState
+					? new ViewLayoutWriter()
+					: new ViewLayoutCompareChanges();
+
+				// Do this only if we are switching to Writer normal layout.
+				// Try to handle this in constructor for compare-changes layout.
+				if (commandState) {
+					TileManager.redraw();
+					app.map._docLayer._fitWidthZoom(null, null, true);
+					app.activeDocument.activeLayout.sendClientVisibleArea();
+					app.sectionContainer.requestReDraw();
+				}
 			}
 		};
 	}
@@ -809,9 +879,11 @@ class Dispatcher {
 	public dispatch(action: string, data?: any) {
 		// Don't allow to execute new actions while any dialog is visible.
 		// It prevents launching multiple instances of the same dialog.
+		// Exception: validatedialogsa11y needs to run when dialogs are open.
 		if (
-			app.map.dialog.hasOpenedDialog() ||
-			(app.map.jsdialog && app.map.jsdialog.hasDialogOpened())
+			action !== 'validatedialogsa11y' &&
+			(app.map.dialog.hasOpenedDialog() ||
+				(app.map.jsdialog && app.map.jsdialog.hasDialogOpened()))
 		) {
 			app.map.dialog.blinkOpenDialog();
 			console.debug('Cannot dispatch: ' + action + ' when dialog is opened.');

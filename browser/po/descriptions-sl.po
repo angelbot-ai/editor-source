@@ -1,12 +1,12 @@
-# Martin Srebotnjak <miles@filmsi.net>, 2020, 2021, 2024.
+# Martin Srebotnjak <miles@filmsi.net>, 2020, 2021, 2024, 2026.
 # Andras Timar <andras.timar@collabora.com>, 2021.
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-17 08:08+0200\n"
-"PO-Revision-Date: 2024-09-02 16:11+0000\n"
-"Last-Translator: Martin Srebotnjak <miles@filmsi.net>\n"
+"POT-Creation-Date: 2026-02-13 19:20+0200\n"
+"PO-Revision-Date: 2026-02-03 12:42+0000\n"
+"Last-Translator: Anonymous <noreply@weblate.org>\n"
 "Language-Team: Slovenian <https://hosted.weblate.org/projects/collabora-"
 "online/app-store-descriptions/sl/>\n"
 "Language: sl\n"
@@ -41,7 +41,7 @@ msgid ""
 msgstr ""
 "Collabora Office je program za urejanje besedil, elektronske preglednice in "
 "predstavitve, zasnovan na LibreOffice, najpriljubljenejšemu svetovnemu "
-"pisarniškemu paketu odprte kode - ki pa je tKO na voljo še na Androidu, s "
+"pisarniškemu paketu odprte kode - ki pa je tako na voljo še na Androidu, s "
 "čimer širi možnosti dela na mobilnih napravah in za sodelovanje z drugimi."
 
 #. Long description

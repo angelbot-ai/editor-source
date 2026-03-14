@@ -111,7 +111,7 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 		this._controlHandlers['cancelbutton'] = this._pushbuttonControl;
 		this._controlHandlers['combobox'] = JSDialog.combobox;
 		this._controlHandlers['comboboxentry'] = JSDialog.comboboxEntry;
-		this._controlHandlers['listbox'] = this._listboxControl;
+		this._controlHandlers['listbox'] = JSDialog.listbox;
 		this._controlHandlers['valueset'] = this._valuesetControl;
 		this._controlHandlers['fixedtext'] = this._fixedtextControl;
 		this._controlHandlers['linkbutton'] = this._linkButtonControl;
@@ -152,8 +152,8 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 		this._controlHandlers['spinnerimg'] = this._spinnerImgControl;
 		this._controlHandlers['image'] = this._imageHandler;
 		this._controlHandlers['scrollwindow'] = JSDialog.scrolledWindow;
-		this._controlHandlers['customtoolitem'] = this._mapDispatchToolItem;
-		this._controlHandlers['bigcustomtoolitem'] = this._mapBigDispatchToolItem;
+		this._controlHandlers['customtoolitem'] = JSDialog.dispatchToolitem;
+		this._controlHandlers['bigcustomtoolitem'] = JSDialog.bigDispatchToolitem;
 		this._controlHandlers['calendar'] = JSDialog.calendar;
 		this._controlHandlers['htmlcontent'] = JSDialog.htmlContent;
 		this._controlHandlers['colorpicker'] = JSDialog.colorPicker;
@@ -752,23 +752,28 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 			container.id = data.id;
 
 			var expanded = data.expanded === true || (data.children[0] && data.children[0].checked === true);
+			var expander = window.L.DomUtil.create('div', 'ui-expander ' + builder.options.cssClass, container);
 			if (data.children[0].text && data.children[0].text !== '') {
 				var prefix = data.children[0].id ? data.children[0].id : data.id;
-				var expander = window.L.DomUtil.create('button', 'ui-expander ' + builder.options.cssClass, container);
-				expander.tabIndex = '0';
-				expander.setAttribute('aria-controls', prefix + '-children');
-				var label = window.L.DomUtil.create('span', 'ui-expander-label ' + builder.options.cssClass, expander);
+
+				// W3C accordion pattern: https://www.w3.org/WAI/ARIA/apg/patterns/accordion/examples/accordion
+				var heading = window.L.DomUtil.create('h2', 'ui-expander-heading ' + builder.options.cssClass, expander);
+				var expanderBtn = window.L.DomUtil.create('button', 'ui-expander-btn ' + builder.options.cssClass, heading);
+				expanderBtn.tabIndex = '0';
+				expanderBtn.setAttribute('aria-controls', prefix + '-children');
+
+				var label = window.L.DomUtil.create('span', 'ui-expander-label ' + builder.options.cssClass, expanderBtn);
 				label.innerText = builder._cleanText(data.children[0].text);
 				label.id = prefix + '-label';
 				if (data.children[0].visible === false)
 					window.L.DomUtil.addClass(label, 'hidden');
-				builder.postProcess(expander, data.children[0]);
+				builder.postProcess(expanderBtn, data.children[0]);
 
 				var state = data.children.length > 1 && expanded;
 				if (state) {
 					window.L.DomUtil.addClass(label, 'expanded');
 				}
-				expander.setAttribute('aria-expanded', state);
+				expanderBtn.setAttribute('aria-expanded', state);
 
 				var toggleFunction = function () {
 					if (customCallback)
@@ -780,12 +785,12 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 					$(expander).siblings().toggleClass('expanded');
 
 					// Toggle aria-expanded attribute
-					const currentState = expander.getAttribute('aria-expanded') === 'true';
-					expander.setAttribute('aria-expanded', (!currentState).toString());
+					const currentState = expanderBtn.getAttribute('aria-expanded') === 'true';
+					expanderBtn.setAttribute('aria-expanded', (!currentState).toString());
 				};
 
-				$(expander).click(toggleFunction);
-				$(expander).keypress(function (event) {
+				$(expanderBtn).click(toggleFunction);
+				$(expanderBtn).keypress(function (event) {
 					if (event.which === 13) {
 						toggleFunction();
 						event.preventDefault();
@@ -795,16 +800,18 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 
 			var expanderChildren = window.L.DomUtil.create('div', 'ui-expander-content ' + builder.options.cssClass, container);
 			expanderChildren.id = prefix + '-children';
+			expanderChildren.setAttribute('role', 'region');
+			expanderChildren.setAttribute('aria-labelledby', prefix + '-label');
 
 			if (expanded) {
 				if (data.children.length > 1) {
 					label.classList.add('expanded');
-					expander.setAttribute('aria-expanded', 'true');
+					expanderBtn.setAttribute('aria-expanded', 'true');
 				}
 				expanderChildren.classList.add('expanded');
 			}
 			else {
-				expander.setAttribute('aria-expanded', 'false');
+				expanderBtn.setAttribute('aria-expanded', 'false');
 			}
 
 			var children = [];
@@ -1320,10 +1327,8 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 		const isDisabled = data.enabled === false;
 		if (isDisabled) {
 			wrapper.setAttribute('disabled', 'true');
-			wrapper.setAttribute('aria-disabled', true);
 			pushbutton.setAttribute('disabled', 'true');
 			pushbutton.setAttribute('aria-disabled', true);
-
 		}
 
 		JSDialog.SynchronizeDisabledState(wrapper, [pushbutton]);
@@ -1349,6 +1354,10 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 			window.L.control.attachTooltipEventListener(pushbutton, builder.map);
 		}
 
+		if (data.aria && data.aria.role) {
+			pushbutton.setAttribute('role', data.aria.role);
+		}
+
 		builder.map.hideRestrictedItems(data, wrapper, pushbutton);
 		builder.map.disableLockedItem(data, wrapper, pushbutton);
 		if (data.hidden)
@@ -1358,47 +1367,29 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 	},
 
 	_linkButtonControl: function(parentContainer, data, builder) {
-		var textContent = window.L.DomUtil.create('label', builder.options.cssClass + " ui-linkbutton", parentContainer);
-
-		if (data.labelFor)
-			textContent.htmlFor = data.labelFor + '-input';
+		var buttonLink = window.L.DomUtil.create('button', builder.options.cssClass + " ui-linkbutton", parentContainer);
 
 		if (data.text)
-			textContent.textContent = builder._cleanText(data.text);
+			buttonLink.textContent = builder._cleanText(data.text);
 		else if (data.html)
-			textContent.innerHTML = data.html;
+			buttonLink.innerHTML = data.html;
 
 		var accKey = builder._getAccessKeyFromText(data.text);
-		builder._stressAccessKey(textContent, accKey);
+		builder._stressAccessKey(buttonLink, accKey);
 
-		app.layoutingService.appendLayoutingTask(function () {
-			var labelledControl = document.getElementById(data.labelFor);
-			if (labelledControl) {
-				var target = labelledControl;
-				var input = labelledControl.querySelector('input');
-				if (input)
-					target = input;
-				var select = labelledControl.querySelector('select');
-				if (select)
-					target = select;
-
-				builder._setAccessKey(target, accKey);
-			}
-		});
-
-		textContent.id = data.id;
+		buttonLink.id = data.id;
 		if (data.style && data.style.length) {
-			window.L.DomUtil.addClass(textContent, data.style);
+			window.L.DomUtil.addClass(buttonLink, data.style);
 		} else {
-			window.L.DomUtil.addClass(textContent, 'ui-text');
+			window.L.DomUtil.addClass(buttonLink, 'ui-text');
 		}
 		if (data.hidden)
-			$(textContent).hide();
+			$(buttonLink).hide();
 
 		var clickFunction = function () {
 				builder.callback('linkbutton', 'click', data, null, builder);
 		};
-		$(textContent).click(clickFunction);
+		$(buttonLink).click(clickFunction);
 		return false;
 	},
 
@@ -1410,77 +1401,6 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 		} else if (data.command == '.uno:StyleApply') {
 			data.text = _('Style');
 		}
-	},
-
-	_listboxControl: function(parentContainer, data, builder) {
-		var title = data.text;
-		var selectedEntryIsString = false;
-		if (data.selectedEntries) {
-			selectedEntryIsString = isNaN(parseInt(data.selectedEntries[0]));
-			if (title && title.length) {
-				// pass
-			} else if (selectedEntryIsString)
-				title = builder._cleanText(data.selectedEntries[0]);
-			else if (data.entries && data.entries.length > data.selectedEntries[0])
-				title = data.entries[data.selectedEntries[0]];
-		}
-		title = builder._cleanText(title);
-
-		var container = window.L.DomUtil.create('div', builder.options.cssClass + ' ui-listbox-container ', parentContainer);
-		container.id = data.id;
-
-		var listbox = window.L.DomUtil.create('select', builder.options.cssClass + ' ui-listbox ', container);
-		listbox.id = data.id + '-input';
-
-		JSDialog.SetupA11yLabelForLabelableElement(parentContainer, listbox, data, builder);
-
-		var listboxArrow = window.L.DomUtil.create('span', builder.options.cssClass + ' ui-listbox-arrow', container);
-		listboxArrow.id = 'listbox-arrow-' + data.id;
-
-
-		if (data.enabled === false) {
-			container.disabled = true;
-			listbox.disabled = true;
-			container.setAttribute('disabled', 'true');
-		}
-
-		JSDialog.SynchronizeDisabledState(container, [listbox]);
-
-		$(listbox).change(() => {
-			if ($(listbox).val())
-				builder.callback('combobox', 'selected', data, $(listbox).val()+ ';' + $(listbox).children('option:selected').text(), builder);
-		});
-		var hasSelectedEntry = false;
-		if (typeof(data.entries) === 'object') {
-			for (var index in data.entries) {
-				var isSelected = false;
-				if ((data.selectedEntries && index == data.selectedEntries[0])
-					|| (data.selectedEntries && selectedEntryIsString && data.entries[index] === data.selectedEntries[0])
-					|| data.entries[index] == title) {
-					isSelected = true;
-				}
-
-				var option = window.L.DomUtil.create('option', '', listbox);
-				option.value = index;
-				option.innerText = data.entries[index];
-				if (isSelected) {
-					option.selected = true;
-					hasSelectedEntry = true;
-				}
-			}
-		}
-		// no selected entry; set the visible value to empty string unless the font is not included in the entries
-		if (!hasSelectedEntry) {
-			if (title) {
-				var newOption = window.L.DomUtil.create('option', '', listbox);
-				newOption.value = ++index;
-				newOption.innerText = title;
-				newOption.selected = true;
-			} else
-				$(listbox).val('');
-		}
-
-		return false;
 	},
 
 	_valuesetControl: function (parentContainer, data, builder) {
@@ -1520,14 +1440,12 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 
 	_fixedtextControl: function(parentContainer, data, builder) {
 		// Check if this label should render as static content(i.e. span) instead of interactive label
-		// This property is set by LibreOffice Kit when accessible-role="static" is detected
-		if(data.renderAsStatic)
+		if (!data.labelFor || !JSDialog.GetFormControlTypesInLO().has(data.labelForType))
 			return JSDialog.StaticText(parentContainer, data, builder);
 
 		var fixedtext = window.L.DomUtil.create('label', builder.options.cssClass, parentContainer);
 
-		if (data.labelFor)
-			fixedtext.htmlFor = data.labelFor + '-input';
+		fixedtext.htmlFor = data.labelFor + '-input';
 
 		if (data.text)
 			fixedtext.textContent = builder._cleanText(data.text);
@@ -1537,10 +1455,8 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 		var accKey = builder._getAccessKeyFromText(data.text);
 		builder._stressAccessKey(fixedtext, accKey);
 
-		const labelableElements = ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'METER', 'OUTPUT', 'PROGRESS'];
-
 		const updateLabelForAttribute = function(label, labelledControl) {
-			const isLabelable = labelableElements.includes(labelledControl.nodeName);
+			const isLabelable = JSDialog.GetFormControlTypesInCO().has(labelledControl.nodeName);
 			const isHiddenInput = labelledControl.nodeName === 'INPUT' && labelledControl.type === 'hidden';
 
 			// For labelable element always use htmlFor
@@ -1799,6 +1715,7 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 		return str.indexOf('lc_') === 0;
 	},
 
+	// TODO: move to jsdialog/Widget.Toolitem.ts
 	_unoToolButton: function(parentContainer, data, builder, options) {
 		var button = null;
 
@@ -1809,28 +1726,24 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 		controls['container'] = div;
 		div.tabIndex = data.tabIndex !== undefined ? data.tabIndex : -1;
 
-		if(data.index)
+		if (data.index)
 			div.setAttribute('index', data.index);
 
 		if (data.class)
-			div.classList.add(data.class);
+			window.L.DomUtil.addClass(div, data.class);
 
 		const hasDropdownArrow = !!(options && options.hasDropdownArrow);
 		const isSplitButton = !!data.applyCallback;
 		const isDropdownButton = !!data.dropdown;
+		var shouldHaveArrowbackground = hasDropdownArrow || isDropdownButton;
 
-		/**
-		 * Determines if the dropdown arrow should be interactive (focusable button) vs decorative (div).
-		 * This affects ARIA attribute placement and arrowbackground element type creation.
-		 */
-		const isArrowInteractive = (hasDropdownArrow && isSplitButton) || isDropdownButton;
+		const hasPopupRole = data.aria && data.aria.role === 'popup';
+
 		var isRealUnoCommand = true;
-		var hasPopUp = false;
 		var hasImage = true;
 
 		if (data.text && data.text.endsWith('...')) {
 			data.text = data.text.replace('...', '');
-			hasPopUp = true;
 		}
 
 		if (data && data.image === false) {
@@ -1845,11 +1758,86 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 		const setDisabled = (disabled) => {
 			if (disabled) {
 				div.setAttribute('disabled', 'true');
-				div.setAttribute('aria-disabled', true);
+				if (button) {
+					button.setAttribute('aria-disabled', true);
+				}
 			} else {
 				div.removeAttribute('disabled');
-				div.removeAttribute('aria-disabled');
+				if (button) {
+					button.removeAttribute('aria-disabled');
+				}
 			}
+		};
+
+		const isMainButtonToggle = function(commandName) {
+			const mainBtnToggleCmds = [
+				'.uno:DefaultBullet',
+				'.uno:DefaultNumbering',
+				'.uno:ObjectAlignLeft',
+				'.uno:TrackChanges',
+				'.uno:Underline',
+			];
+
+			return mainBtnToggleCmds.includes(commandName);
+		};
+
+		const isMainButtonDialog = function(commandName) {
+			const mainButtonDialogCmds = [
+				'.uno:SetOutline',
+				'.uno:Spacing',
+			];
+
+			return mainButtonDialogCmds.includes(commandName);
+		};
+
+		const isMainButtonApplyAction = function(commandName, elementId) {
+			if (elementId.startsWith('overflow-button')) return true;
+
+			const mainBtnApplyActionCmds = [
+				'.uno:AcceptTrackedChangeToNext',
+				'.uno:BackgroundColor',
+				'.uno:CharBackColor',
+				'.uno:FillColor',
+				'.uno:FontColor',
+				'.uno:FormatBulletsMenu',
+				'.uno:GrafContrast',
+				'.uno:GrafLuminance',
+				'.uno:GrafMode',
+				'.uno:GrafTransparence',
+				'.uno:InsertAnnotation',
+				'.uno:InsertPageHeader',
+				'.uno:NumberFormatCurrency',
+				'.uno:RejectTrackedChangeToNext',
+				'.uno:TableCellBackgroundColor',
+				'.uno:XLineColor',
+				'.uno:Zoom',
+			];
+
+			return mainBtnApplyActionCmds.includes(commandName);
+		};
+
+		const isMainButtonDropdown = function(commandName) {
+			const mainBtnDropdownCmds = [
+				'.uno:BasicShapes',
+				'.uno:CharSpacing',
+				'.uno:FormatMenu',
+				'.uno:FormattingMarkMenu',
+				'.uno:InsertTable',
+				'.uno:LanguageMenu',
+				'.uno:LineSpacing',
+				'.uno:Paste',
+				'.uno:SetBorderStyle',
+				'downloadas',
+				'LanguageStatusMenu',
+				'MenuMargins',
+				'MenuOrientation',
+				'MenuPageSizesWriter',
+				'StateTableCellMenu',
+				'viewModeDropdownButton',
+				'zoom',
+			];
+
+			return mainBtnDropdownCmds.includes(commandName);
 		};
 
 		if (data.command || data.postmessage === true) {
@@ -1880,22 +1868,18 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 			var buttonId = id + '-button';
 
 			button = window.L.DomUtil.create('button', 'ui-content unobutton', div);
-			if(div.tabIndex == 0)
+			if (div.tabIndex == 0)
 				button.tabIndex = -1; // prevent button from taking focus since container div itself is focusable element
 			button.id = buttonId;
 
-			itemsToSyncWithContainer.push(button);
+			JSDialog.SetupA11yLabelForNonLabelableElement(button, data, builder);
 
-			JSDialog.AddAriaLabel(button, data, builder);
+			itemsToSyncWithContainer.push(button);
 
 			if (!data.accessKey)
 				builder._setAccessKey(button, builder._getAccessKeyFromText(data.text));
 			else
 				button.accessKey = data.accessKey;
-
-			// if dropdown arrow does not exist or is not interactive then only button can have aria-haspopup
-			if (hasPopUp && !isArrowInteractive)
-				button.setAttribute('aria-haspopup', true);
 
 			if (data.w2icon) {
 				// FIXME: DEPRECATED, this is legacy way to setup icon based on CSS class
@@ -1940,33 +1924,33 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 				$(div).addClass('no-label');
 			}
 
-			// for Accessibility : graphic elements are located within buttons, the img should receive an empty alt
-			if(button.getAttribute('aria-label')){ // if we already set the aria-label then do not go for image alt attr
-				buttonImage.alt = '';
-			}
-			else if (buttonImage !== false) {
-				if(data.aria) {
-					buttonImage.alt = data.aria.label;
-				} else {
-					buttonImage.alt = builder._cleanText(data.text);
-				}
-			}
-
 			let tooltip = builder._cleanText(data.tooltip) || builder._cleanText(data.text);
-			if (data.command) // Add shortcut to tooltip based on command
+			if (data.command && (!tooltip || !tooltip.includes('('))) // Add shortcut to tooltip based on command
 				tooltip = JSDialog.ShortcutsUtil.getShortcut(tooltip, data.command);
 			div.setAttribute('data-cooltip', tooltip);
 
+			// Set aria-pressed only if:
+			// 1. No dropdown arrow and
+			// 2. A real toggle button
+			const setAriaPressedForToggleBtn = (value) => {
+				if ((!shouldHaveArrowbackground &&
+					data.command &&
+					builder.map['stateChangeHandler'] &&
+					builder.map['stateChangeHandler'].getItemValue(data.command) !== undefined)
+					|| isMainButtonToggle(data.command)) {
+					button.setAttribute('aria-pressed', value);
+				}
+			};
 			const selectFn = () => {
 				window.L.DomUtil.addClass(button, 'selected');
 				window.L.DomUtil.addClass(div, 'selected');
-				button.setAttribute('aria-pressed', true);
+				setAriaPressedForToggleBtn(true);
 			};
 
 			const unSelectFn = () => {
 				window.L.DomUtil.removeClass(button, 'selected');
 				window.L.DomUtil.removeClass(div, 'selected');
-				button.setAttribute('aria-pressed', false);
+				setAriaPressedForToggleBtn(false);
 			};
 
 			if (data.command) {
@@ -2007,64 +1991,114 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 			controls['label'] = span;
 		}
 
-		if (hasDropdownArrow || isDropdownButton) {
+		const hasPopUp = hasPopupRole || isMainButtonDialog(data.command) || isMainButtonDropdown(data.command);
+
+		if (hasPopUp) {
+			button.setAttribute('aria-expanded', false);
+			if(isMainButtonDialog(data.command))
+				button.setAttribute('aria-haspopup', 'dialog');
+			else
+				button.setAttribute('aria-haspopup', true);
+		}
+
+		JSDialog.SetupA11yLabelForNonLabelableElement(button, data, builder);
+
+		// for Accessibility : graphic elements are located within buttons, the img should receive an empty alt
+		if (button.getAttribute('aria-label') || button.getAttribute('aria-labelledby')){ // if we already set the aria-label or aria-labelledby then do not go for image alt attr
+			buttonImage.alt = '';
+		}
+		else if (buttonImage !== false) {
+			if (data.aria)
+				buttonImage.alt = data.aria.label;
+			else
+				buttonImage.alt = builder._cleanText(data.text);
+		}
+
+		const getAriaLabelGroupText = function(command) {
+			if (isMainButtonToggle(command))
+				return _('Toggle dropdown');
+			else if (isMainButtonDialog(command))
+				return _('Dialog dropdown');
+			else if (isMainButtonApplyAction(command, id))
+				return _('Apply action dropdown');
+
+			return _('Dropdown');
+		};
+
+		var arrowbackground;
+		if (shouldHaveArrowbackground) {
 			$(div).addClass('has-dropdown');
 			div.setAttribute('role', 'group');
-			var arrowbackground;
-			// isArrowInteractive is true for split buttons or dropdown buttons
-			if (isArrowInteractive) {
+
+			const a11yData = {
+				id: id,
+				type: data.type,
+				aria: {
+					label: getAriaLabelGroupText(data.command),
+				},
+			};
+			JSDialog.AddAriaLabel(div, a11yData, builder);
+
+			// shouldHaveArrowbackground is true when we have dropdown arrow or dropdown button
+			// if main button and arrowbackground opens same dropdown then only arrowbackground should be div.
+			// otherwise, it should be button always.
+			const shouldArrowbackgroundButton = isSplitButton || !isMainButtonDropdown(data.command);
+			if (shouldArrowbackgroundButton) {
 				// Arrow should be a real button (user can interact with it)
 				arrowbackground = window.L.DomUtil.create('button', 'arrowbackground', div);
+				arrowbackground.tabIndex = '0'; // Make arrow focusable
+
+				const buttonText = data.aria && data.aria.label ? data.aria.label : builder._cleanText(data.text);
+				const dropdownAriaLabelText = _('Open {name}').replace('{name}', buttonText);
+				arrowbackground.setAttribute('aria-label', dropdownAriaLabelText);
+
+				arrowbackground.setAttribute('aria-haspopup', true);
+				arrowbackground.setAttribute('aria-expanded', false);
 			} else {
 				// Arrow is just decoration
 				arrowbackground = window.L.DomUtil.create('div', 'arrowbackground', div);
 				arrowbackground.setAttribute('aria-hidden', 'true');
+				arrowbackground.tabIndex = '-1'; // arrow is just decorative
 			}
-			window.L.DomUtil.create('i', 'unoarrow', arrowbackground);
+			var unoarrow = window.L.DomUtil.create('span', 'unoarrow', arrowbackground);
+			unoarrow.setAttribute('aria-hidden', 'true');
 			controls['arrow'] = arrowbackground;
 
 			if (!hasDropdownArrow && isDropdownButton) {
-				// Attach both 'click' and 'keydown' event listeners for dropdown buttons only
+				// Attach 'click' event listeners for dropdown buttons only
 				arrowbackground.addEventListener('click', function (event) {
 					openToolBoxMenu(event);
-				});
-				arrowbackground.addEventListener('keydown', function (event) {
-					switch (event.key) {
-						case 'Enter':
-							openToolBoxMenu(event);
-							break;
+
+					if (shouldArrowbackgroundButton) {
+						arrowbackground.setAttribute('aria-expanded', 'true');
+					} else {
+						button.setAttribute('aria-expanded', 'true');
 					}
 				});
 
 				div.closeDropdown = function() {
 					builder.callback('toolbox', 'closemenu', parentContainer, data.command, builder);
+
+					if (shouldArrowbackgroundButton) {
+						arrowbackground.setAttribute('aria-expanded', 'false');
+					} else {
+						button.setAttribute('aria-expanded', 'false');
+					}
 				};
 			}
 			itemsToSyncWithContainer.push(arrowbackground);
 		}
 
-		if (arrowbackground) {
-			// if main button element in split button works same as arrowbackground then make sure arrowbackground not focusable due to a11y conflicts
-			isSplitButton ? arrowbackground.tabIndex = '0' : arrowbackground.tabIndex = '-1';
-
-			if (isArrowInteractive)  {
-				const buttonText = data.aria && data.aria.label ? data.aria.label : builder._cleanText(data.text);
-				const dropdownAriaLabelText = _('Open {name}').replace('{name}', buttonText);
-				arrowbackground.setAttribute('aria-label', dropdownAriaLabelText);
-				arrowbackground.setAttribute('aria-haspopup', true);
-				arrowbackground.setAttribute('aria-expanded', false);
-			} else {
-				// If the dropdown arrow is not interactive then we want aria-expanded on interactive button
-				button.setAttribute('aria-expanded', false);
-			}
-		}
-
 		JSDialog.SynchronizeDisabledState(div, itemsToSyncWithContainer);
+
+		// _onDropDown only works for splitbutton or dropdown arrow button
+		// for decorative button we need to manage it via click function and closeDropdown
 		div._onDropDown = function(open) {
-			// Only set aria-expanded on the button if the arrow is not interactive
-			if (!isArrowInteractive)
+
+			if (isMainButtonDropdown(data.command))
 				button.setAttribute('aria-expanded', open);
-			arrowbackground.setAttribute('aria-expanded', open);
+			else
+				arrowbackground.setAttribute('aria-expanded', open);
 		};
 
 		var openToolBoxMenu = function(event) {
@@ -2086,6 +2120,7 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 					builder.callback('toolbutton', 'click', button, data.command, builder);
 				else {
 					builder.callback('toolbox', 'click', parentContainer, data.command, builder);
+					button.setAttribute('aria-expanded', 'true');
 				}
 			}
 			e.preventDefault();
@@ -2108,7 +2143,7 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 		$(controls.label).on('click', clickFunction);
 		// We need a way to also handle the custom tooltip for any tool button like save in shortcut bar
 		if (data.isCustomTooltip) {
-			this._handleCutomTooltip(div, builder);
+			this._handleCustomTooltip(div, builder);
 		}
 		else if (!hasLabel || hasShortcut) {
 			$(div).on('mouseenter', mouseEnterFunction);
@@ -2134,8 +2169,10 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 		return controls;
 	},
 
-	_handleCutomTooltip: function(elem, builder) {
-		switch (elem.id) {
+	_handleCustomTooltip: function(elem, builder) {
+		// Prefer modelid, fallback to id if modelid is missing
+		const lookupId = elem.getAttribute('modelid') || elem.id;
+		switch (lookupId) {
 			case 'save':
 				$(elem).on('mouseenter', window.touch.mouseOnly(function() {
 					if (builder.map.tooltip)
@@ -2147,92 +2184,6 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 						builder.map.tooltip.hide(elem);
 				});
 		}
-	},
-
-	_mapDispatchToolItem: function (parentContainer, data, builder) {
-		if (!data.command)
-			data.command = data.id;
-
-		if (data.id && data.id !== 'exportas' && data.id.startsWith('export')) {
-			var format = data.id.substring('export'.length);
-			app.registerExportFormat(data.text, format);
-
-			if (builder.map['wopi'].HideExportOption)
-				return false;
-		}
-
-		if (data.inlineLabel !== undefined) {
-			var backupInlineText = builder.options.useInLineLabelsForUnoButtons;
-			builder.options.useInLineLabelsForUnoButtons = data.inlineLabel;
-		}
-
-		var control = builder._unoToolButton(parentContainer, data, builder);
-
-		if (data.inlineLabel !== undefined)
-			builder.options.useInLineLabelsForUnoButtons = backupInlineText;
-
-		$(control.button).unbind('click');
-		$(control.label).unbind('click');
-
-		if (!builder.map.isLockedItem(data)) {
-			var handlePressAndHold = function(data) {
-				const scrollingInterval = setInterval(function () {
-					app.dispatcher.dispatch(data.command);
-				}, 100);
-
-				$(document).one('mouseup', function () {
-					clearInterval(scrollingInterval);
-				});
-			};
-
-			// Handle "Press+Hold" Event
-			if (data.pressAndHold) {
-				$(control.container).on('mousedown', (e) => {
-					if (e.button !== 0 // Only handle left mouse button
-						|| control.container.getAttribute('disabled') !== null)
-						return;
-
-					const pressAndHoldTimer = setTimeout(() => {
-						handlePressAndHold(data);
-					}, 500);
-
-					$(document).one('mouseup', () => {
-						clearTimeout(pressAndHoldTimer);
-					});
-				});
-			}
-
-			$(control.container).click(function () {
-				if (control.container.getAttribute('disabled') === null)
-					app.dispatcher.dispatch(data.command);
-			});
-		}
-
-		builder._preventDocumentLosingFocusOnClick(control.container);
-	},
-
-	_mapBigDispatchToolItem: function (parentContainer, data, builder) {
-		if (!data.command)
-			data.command = data.id;
-
-		var noLabels = builder.options.noLabelsForUnoButtons;
-		builder.options.noLabelsForUnoButtons = false;
-
-		var control = builder._unoToolButton(parentContainer, data, builder);
-
-		builder.options.noLabelsForUnoButtons = noLabels;
-
-		$(control.button).unbind('click');
-		$(control.label).unbind('click');
-
-		if (!builder.map.isLockedItem(data)) {
-			$(control.container).click(function (e) {
-				e.preventDefault();
-				app.dispatcher.dispatch(data.command);
-			});
-		}
-
-		builder._preventDocumentLosingFocusOnClick(control.container);
 	},
 
 	_divContainerHandler: function (parentContainer, data, builder) {
@@ -2700,20 +2651,9 @@ window.L.Control.JSDialogBuilder = window.L.Control.extend({
 			&& data.type !== 'edit'
 			&& data.type !== 'deck'
 			&& data.type !== 'pushbutton'
+			&& data.type !== 'iconview'
 			)
 			control.setAttribute('tabIndex', '0');
-
-		if (control && window.L.Browser.cypressTest && window.app.a11yValidator) {
-			// setupA11yLabelForLabelableElement uses two layouting task depth,
-			// so use three here to do this test after those have added the labels
-			app.layoutingService.appendLayoutingTask(() => {
-				app.layoutingService.appendLayoutingTask(() => {
-					app.layoutingService.appendLayoutingTask(() => {
-						window.app.a11yValidator.checkWidget(data.type, control);
-					});
-				});
-			});
-		}
 	},
 
 	// some widgets we want to modify / change

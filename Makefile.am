@@ -23,7 +23,7 @@ endif
 
 else
 
-SUBDIRS = . browser
+SUBDIRS = browser .
 
 if ENABLE_TESTS
 SUBDIRS += test
@@ -262,11 +262,17 @@ coolforkit_caps_SOURCES = $(coolforkit_sources) \
 
 coolforkit_caps_LDADD = ${coolforkit_ldadd}
 
+# Define variant to ensure different binary content and thus different build-id
+coolforkit_caps_CPPFLAGS = $(AM_CPPFLAGS) -DCOOL_FORKIT_VARIANT=\"caps\"
+
 coolforkit_ns_SOURCES = $(coolforkit_sources) \
                         $(shared_sources) \
                         kit/forkit-main.cpp
 
 coolforkit_ns_LDADD = ${coolforkit_ldadd}
+
+# Define variant to ensure different binary content and thus different build-id
+coolforkit_ns_CPPFLAGS = $(AM_CPPFLAGS) -DCOOL_FORKIT_VARIANT=\"ns\"
 
 if ENABLE_DEBUG
 coolwsd_inproc_SOURCES = $(coolwsd_sources) \
@@ -845,8 +851,8 @@ clean-clangd:
 clean-vscode: clean-clangd
 	cd $(abs_srcdir) && rm -rf .vscode
 
-browser/node_modules: browser/package.json browser/archived-packages
-	@cd browser && npm install
+browser/node_modules: browser/package.json browser/node_shrinkpack
+	@cd browser && UV_USE_IO_URING=0 npm ci --offline
 
 eslint: browser/node_modules
 	@$(MAKE) -C browser eslint
@@ -900,7 +906,7 @@ check-for-system-nss:
 
 check-recursive: eslint
 
-check: check-for-system-nss prettier eslint presets-dir check-recursive
+check: all-local check-for-system-nss prettier eslint presets-dir check-recursive
 	$(GEN_COVERAGE_COMMAND)
 
 coverage-report:

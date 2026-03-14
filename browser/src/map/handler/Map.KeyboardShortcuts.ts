@@ -307,6 +307,7 @@ keyboardShortcuts.definitions.set('default', new Array<ShortcutDescriptor>(
     new ShortcutDescriptor({ eventType: 'keydown', modifier: Mod.CTRL, key: 'f', dispatchAction: 'home-search' }),
     new ShortcutDescriptor({ eventType: 'keydown', modifier: Mod.CTRL, key: 'p', dispatchAction: 'print' }),
     new ShortcutDescriptor({ eventType: 'keydown', modifier: Mod.CTRL, key: 's', dispatchAction: 'save', dispatchData: 'keyboard' }),
+    new ShortcutDescriptor({ eventType: 'keydown', modifier: Mod.CTRL | Mod.SHIFT | Mod.ALT, key: 'V', unoAction: '.uno:PasteSpecial', platform: Platform.WINDOWS | Platform.LINUX | Platform.MAC | Platform.CHROMEOSAPP}),
 
     // Calc.
     new ShortcutDescriptor({ docType: 'spreadsheet', eventType: 'keydown', modifier: Mod.CTRL | Mod.SHIFT, key: 'PageUp' }),
@@ -374,6 +375,11 @@ keyboardShortcuts.definitions.set('de', new Array<ShortcutDescriptor>(
 
     // Passthrough some system shortcuts
     new ShortcutDescriptor({ eventType: 'keydown', modifier: Mod.CTRL | Mod.SHIFT, key: '`', preventDefault: false, platform: Platform.MAC }), // Cycle through windows
+));
+
+// French shortcuts.
+keyboardShortcuts.definitions.set('fr', new Array<ShortcutDescriptor>(
+    new ShortcutDescriptor({ eventType: 'keydown', modifier: Mod.CTRL, key: 'g', unoAction: '.uno:Bold' }),
 ));
 
 window.KeyboardShortcuts = keyboardShortcuts;

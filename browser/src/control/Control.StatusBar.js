@@ -251,7 +251,10 @@ class StatusBar extends JSDialog.Toolbar {
 			{type: 'customtoolitem',  id: 'prevpage', command: 'prev', text: _UNO('.uno:PageUp', 'text'), pressAndHold: true, dataPriority: 9},
 			{type: 'customtoolitem',  id: 'nextpage', command: 'next', text: _UNO('.uno:PageDown', 'text'), pressAndHold: true, dataPriority: 9},
 			{type: 'separator', id: 'prevnextbreak', orientation: 'vertical', dataPriority: 9},
+			{type: 'toolitem',  id: 'overview', command: '.uno:InsertCanvasSlide', text: _('Overview'), dataPriority: 9, visible: !app.isReadOnly()},
+			{type: 'separator', id: 'overviewbreak', orientation: 'vertical', dataPriority: 9, visible: !app.isReadOnly()},
 		].concat(window.mode.isTablet() ? [] : [
+			{type: 'customtoolitem',  id: 'fitwidthzoom', command: 'fitwidthzoom', text: _('Zoom to Fit Page Width'), icon: 'pagewidth.svg', dataPriority: 8, visible: false},
 			{type: 'customtoolitem',  id: 'zoomreset', command: 'zoomreset', text: _('Reset zoom'), icon: 'zoomreset.svg', dataPriority: 8},
 			{type: 'customtoolitem',  id: 'zoomout', command: 'zoomout', text: _UNO('.uno:ZoomMinus'), icon: 'minus.svg'},
 			{type: 'menubutton', id: 'zoom', text: '100', selected: 'zoom100', menu: this._generateZoomItems(), image: false},
@@ -292,6 +295,8 @@ class StatusBar extends JSDialog.Toolbar {
 			this.showItem('prev', false);
 			this.showItem('next', false);
 			this.showItem('prevnextbreak', false);
+			this.showItem('overview', false);
+			this.showItem('overviewbreak', false);
 
 			if (!window.mode.isMobile()) {
 				this.showItem('statusdocpos-container', true);
@@ -309,6 +314,9 @@ class StatusBar extends JSDialog.Toolbar {
 			break;
 
 		case 'text':
+			this.showItem('overview', false);
+			this.showItem('overviewbreak', false);
+
 			if (!window.mode.isMobile()) {
 				this.showItem('statepagenumber-container', true);
 				this.showItem('statewordcount-container', true);
@@ -319,9 +327,10 @@ class StatusBar extends JSDialog.Toolbar {
 				this.showItem('permissionmode-container', true);
 				this.showItem('showcomments-container', true);
 				this.showItem('documentstatus-container', true);
+				this.showItem('fitwidthzoom', true);
+				this.showItem('zoomreset', false);
 
-				// Disable for now.
-				//this.showItem('multi-page-view', true);
+				this.showItem('multi-page-view', true);
 			}
 			break;
 

@@ -19,6 +19,7 @@
 /// <reference path="../src/app/Rectangle.ts" />
 /// <reference path="../src/app/LOUtil.ts" />
 /// <reference path="../src/app/ViewLayout.ts" />
+/// <reference path="../src/app/ViewLayoutNewBase.ts" />
 /// <reference path="../src/app/ViewLayoutMultiPage.ts" />
 /// <reference path="../src/app/Util.ts"/>
 /// <reference path="../src/app/DocUtil.ts"/>
@@ -27,6 +28,7 @@
 /// <reference path="../src/app/Events.ts" />
 /// <reference path="../src/canvas/CanvasSectionContainer.ts" />
 /// <reference path="../src/canvas/CanvasSectionObject.ts" />
+/// <reference path="../src/app/ViewLayoutCompareChanges.ts" />
 /// <reference path="../src/canvas/sections/TilesSection.ts" />
 /// <reference path="../src/app/iface/MapZoom.Interface.ts" />
 /// <reference path="../src/app/ServerCommand.ts" />

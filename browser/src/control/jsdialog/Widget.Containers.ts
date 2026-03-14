@@ -70,7 +70,13 @@ JSDialog.grid = function (
 
 	if (data.allyRole) {
 		table.role = data.allyRole;
+
+		if (data.allyRole === 'listbox')
+			table.setAttribute('aria-activedescendant', data.initialSelectedId);
 	}
+
+	if (data.tabIndex !== undefined)
+		table.setAttribute('tabindex', data.tabIndex);
 
 	const gridRowColStyle =
 		'grid-template-rows: repeat(' +
@@ -155,6 +161,10 @@ JSDialog.toolbox = function (
 		}
 	}
 
+	if (data.aria?.role) {
+		toolbox.setAttribute('role', data.aria.role);
+	}
+
 	const enabledCallback = function (enable: boolean) {
 		for (const j in data.children) {
 			const childId = data.children[j].id;
@@ -178,6 +188,15 @@ JSDialog.toolbox = function (
 	const inlineLabels = builder.options.useInLineLabelsForUnoButtons;
 	if (data.hasVerticalParent === true && data.children.length === 1)
 		builder.options.useInLineLabelsForUnoButtons = true;
+
+	if (data.children.length === 1) {
+		if (!data.children[0].labelledBy && data.labelledBy)
+			data.children[0].labelledBy = data.labelledBy;
+		else if (!data.children[0].aria && data.aria)
+			data.children[0].aria = data.aria;
+	} else {
+		JSDialog.SetupA11yLabelForNonLabelableElement(toolbox, data, builder);
+	}
 
 	builder.build(toolbox, data.children, false);
 

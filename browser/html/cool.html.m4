@@ -137,9 +137,6 @@ m4_ifelse(MOBILEAPP,[true],
           <div id="userListSummaryBackground"><button id="userListSummary"></button></div>
         </div>
         <div id="viewMode">
-          <div class="unotoolbutton notebookbar ui-content unospan readonly inline hidden" tabindex="-1" id="readonlyMode">
-              <span class="ui-content unolabel"></span>
-          </div>
         </div>
         <div id="closebuttonwrapperseparator"></div>
         <div id="closebuttonwrapper">
@@ -166,13 +163,14 @@ m4_ifelse(MOBILEAPP,[true],
         <progress id="mobile-progress-bar" class="progress-bar" value="0" max="99"></progress>
       </div>
 
-      <input id="insertgraphic" aria-labelledby="menu-insertgraphic" type="file" accept="image/*">
-      <input id="insertmultimedia" aria-labelledby="menu-insertmultimedia" type="file" accept="audio/*, video/*">
-      <input id="selectbackground" aria-labelledby="menu-selectbackground" type="file" accept="image/*">
+      <input id="insertgraphic" aria-labelledby="menu-insertgraphic" type="file" accept="image/*" tabindex="-1">
+      <input id="insertmultimedia" aria-labelledby="menu-insertmultimedia" type="file" accept="audio/*, video/*" tabindex="-1">
+      <input id="selectbackground" aria-labelledby="menu-selectbackground" type="file" accept="image/*" tabindex="-1">
+      <input id="comparedocuments" aria-labelledby="menu-comparedocuments" type="file" accept="application/*" tabindex="-1">
     </dialog>
 
     <div id="main-document-content">
-      <div id="navigation-sidebar">
+      <nav id="navigation-sidebar">
         <div id="presentation-controls-wrapper" class="readonly">
           <div id="slide-sorter"></div>
           <div id="presentation-toolbar"></div>
@@ -183,7 +181,7 @@ m4_ifelse(MOBILEAPP,[true],
         <div id="quickfind-dock-wrapper">
           <div id="quickfind-panel" class="sidebar-panel"></div>
         </div>
-      </div>
+      </nav>
       <div id="navigator-floating-icon"></div>
       <div id="document-container" class="readonly" dir="ltr">
         <div id="map"></div>
@@ -227,18 +225,7 @@ m4_ifelse(MOBILEAPP,[true],
           </div>
           <div id="about-dialog-info-container">
             <div id="about-dialog-info">
-              <div id="coolwsd-version-label"></div>
-              <div class="about-dialog-info-div"><div id="coolwsd-version" dir="ltr"></div></div>
-              <div class="spacer"></div>
-              <div id="lokit-version-label"></div>
-              <div class="about-dialog-info-div"><div id="lokit-version" dir="ltr"></div></div>
-              m4_ifelse(MOBILEAPP,[],[<div id="served-by"><span id="served-by-label"></span>&nbsp;<span id="os-info"></span>&nbsp;<wbr><span id="coolwsd-id"></span></div>],[<p></p>])
-              <div id="slow-proxy"></div>
-              m4_ifelse(DEBUG,[true],[<div id="js-dialog">JSDialogs: <a href="#">View widgets</a></div>])
-              <div id="routeToken"></div>
-              <div id="timeZone"></div>
-              m4_ifelse(MOBILEAPP,[],[<div id="wopi-host-id">%WOPI_HOST_ID%</div>],[<p></p>])
-              <p class="about-dialog-info-div"><span dir="ltr">Copyright © _YEAR_, VENDOR.</span></p>
+              <div id="lokit-version" dir="ltr"></div>
             </div>
           </div>
         </div>
@@ -261,45 +248,49 @@ m4_ifelse(MOBILEAPP, [true],
       ],
      [
       <input type="hidden" id="initial-variables"
-      data-host = "%HOST%"
-      data-service-root = "%SERVICE_ROOT%"
-      data-hexify-url = "%HEXIFY_URL%"
-      data-version-path = "%VERSION%"
+      data-access-header = "%ACCESS_HEADER%"
       data-access-token = "%ACCESS_TOKEN%"
       data-access-token-ttl = "%ACCESS_TOKEN_TTL%"
-      data-no-auth-header = "%NO_AUTH_HEADER%"
-      data-access-header = "%ACCESS_HEADER%"
-      data-post-message-origin-ext = "%POSTMESSAGE_ORIGIN%"
+      data-allow-update-notification = "%ENABLE_UPDATE_NOTIFICATION%"
+      data-auto-show-feedback = "%AUTO_SHOW_FEEDBACK%"
+      data-auto-show-welcome = "%AUTO_SHOW_WELCOME%"
+      data-canvas-slideshow-enabled = "%CANVAS_SLIDESHOW_ENABLED%"
+      data-check-file-info-override = "%CHECK_FILE_INFO_OVERRIDE%"
       data-cool-logging = "%BROWSER_LOGGING%"
       data-coolwsd-version = "%COOLWSD_VERSION%"
-      data-enable-welcome-message = "%ENABLE_WELCOME_MSG%"
-      data-auto-show-welcome = "%AUTO_SHOW_WELCOME%"
-      data-auto-show-feedback = "%AUTO_SHOW_FEEDBACK%"
-      data-allow-update-notification = "%ENABLE_UPDATE_NOTIFICATION%"
-      data-user-interface-mode = "%USER_INTERFACE_MODE%"
-      data-use-integration-theme = "%USE_INTEGRATION_THEME%"
-      data-statusbar-save-indicator = "%STATUSBAR_SAVE_INDICATOR%"
-      data-enable-macros-execution = "%ENABLE_MACROS_EXECUTION%"
-      data-enable-accessibility = "%ENABLE_ACCESSIBILITY%"
-      data-out-of-focus-timeout-secs = "%OUT_OF_FOCUS_TIMEOUT_SECS%"
-      data-idle-timeout-secs = "%IDLE_TIMEOUT_SECS%"
-      data-min-saved-message-timeout-secs = "%MIN_SAVED_MESSAGE_TIMEOUT_SECS%";
-      data-protocol-debug = "%PROTOCOL_DEBUG%"
-      data-enable-debug = "%ENABLE_DEBUG%"
-      data-frame-ancestors = "%FRAME_ANCESTORS%"
-      data-socket-proxy = "%SOCKET_PROXY%"
-      data-ui-defaults = "%UI_DEFAULTS%"
-      data-check-file-info-override = "%CHECK_FILE_INFO_OVERRIDE%"
+      data-copyright-year = _YEAR_
       data-deepl-enabled = "%DEEPL_ENABLED%"
-      data-zotero-enabled = "%ZOTERO_ENABLED%"
       data-document-signing-enabled = "%DOCUMENT_SIGNING_ENABLED%"
-      data-saved-ui-state = "%SAVED_UI_STATE%"
+      data-enable-accessibility = "%ENABLE_ACCESSIBILITY%"
+      data-enable-debug = "%ENABLE_DEBUG%"
+      data-enable-experimental-features = "%EXPERIMENTAL_FEATURES%"
+      data-enable-macros-execution = "%ENABLE_MACROS_EXECUTION%"
+      data-enable-welcome-message = "%ENABLE_WELCOME_MSG%"
       data-extra-export-formats = "%EXTRA_EXPORT_FORMATS%"
-      data-wasm-enabled = "%WASM_ENABLED%"
-      data-indirection-url = "%INDIRECTION_URL%"
+      data-frame-ancestors = "%FRAME_ANCESTORS%"
       data-geolocation-setup = "%GEOLOCATION_SETUP%"
-      data-canvas-slideshow-enabled = "%CANVAS_SLIDESHOW_ENABLED%"
+      data-hexify-url = "%HEXIFY_URL%"
+      data-host = "%HOST%"
+      data-idle-timeout-secs = "%IDLE_TIMEOUT_SECS%"
+      data-indirection-url = "%INDIRECTION_URL%"
+      data-min-saved-message-timeout-secs = "%MIN_SAVED_MESSAGE_TIMEOUT_SECS%";
+      data-no-auth-header = "%NO_AUTH_HEADER%"
+      data-out-of-focus-timeout-secs = "%OUT_OF_FOCUS_TIMEOUT_SECS%"
+      data-post-message-origin-ext = "%POSTMESSAGE_ORIGIN%"
+      data-protocol-debug = "%PROTOCOL_DEBUG%"
+      data-saved-ui-state = "%SAVED_UI_STATE%"
+      data-service-root = "%SERVICE_ROOT%"
+      data-socket-proxy = "%SOCKET_PROXY%"
+      data-statusbar-save-indicator = "%STATUSBAR_SAVE_INDICATOR%"
+      data-ui-defaults = "%UI_DEFAULTS%"
+      data-use-integration-theme = "%USE_INTEGRATION_THEME%"
+      data-user-interface-mode = "%USER_INTERFACE_MODE%"
+      data-vendor = VENDOR
+      data-version-path = "%VERSION%"
+      data-wasm-enabled = "%WASM_ENABLED%"
+      data-wopi-host-id = "%WOPI_HOST_ID%"
       data-wopi-setting-base-url = "%WOPI_SETTING_BASE_URL%"
+      data-zotero-enabled = "%ZOTERO_ENABLED%"
       />
     ])
 

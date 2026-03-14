@@ -128,6 +128,7 @@ class SlideShowPresenter {
 	_progressBarContainer: HTMLDivElement | null = null;
 	_slideNavContainer: HTMLDivElement | null = null;
 	_enableA11y: boolean = false;
+	_fromPresenterConsole: boolean = false;
 	private _pauseTimer: PauseTimerGl | PauseTimer2d;
 	private _slideControlsTimer: ReturnType<typeof setTimeout> | null = null;
 	private _slideShowHandler: SlideShowHandler;
@@ -149,6 +150,7 @@ class SlideShowPresenter {
 	// which means they are not leader but they are not follower either
 	private _isFollower: boolean = false;
 	private _isFollowing: boolean = false;
+	private _followBtn: HTMLElement | null = null;
 
 	private showFollow(me: boolean) {
 		this._map.uiManager.showButton('slide-presentation-follow', !me);
@@ -636,6 +638,12 @@ class SlideShowPresenter {
 		this._slideShowHandler.addA11yString(target.getAttribute('aria-label'));
 	}
 
+	private _onPrevNextSlide = (e: Event) => {
+		if (this.isFollower()) this.setFollowing(false);
+		if ((e.target as any).id === 'previous') this._onPrevSlide(e);
+		else if ((e.target as any).id === 'next') this._onNextSlide(e);
+	};
+
 	private _onPrevSlide = (e: Event) => {
 		e.stopPropagation();
 		this._slideShowNavigator.rewindEffect();
@@ -643,6 +651,13 @@ class SlideShowPresenter {
 
 	private _onNextSlide = (e: Event) => {
 		e.stopPropagation();
+		// Do not allow follower to go ahead of the leader
+		if (
+			this.isFollower() &&
+			this._slideShowNavigator.currentSlideIndex ===
+				this._slideShowNavigator.getLeaderSlide()
+		)
+			return;
 		if (this._navigateSkipTransition) this._slideShowNavigator.skipEffect();
 		else this._slideShowNavigator.dispatchEffect();
 	};
@@ -699,7 +714,7 @@ class SlideShowPresenter {
 		setImgSize(leftImg);
 		window.L.control.attachTooltipEventListener(leftImg, this._map);
 		app.LOUtil.setImage(leftImg, 'slideshow-slidePrevious.svg', this._map);
-		leftImg.addEventListener('click', this._onPrevSlide);
+		leftImg.addEventListener('click', this._onPrevNextSlide);
 
 		const rightImg = window.L.DomUtil.create('img', 'right-img', container);
 		rightImg.id = 'next';
@@ -709,7 +724,7 @@ class SlideShowPresenter {
 		rightImg.setAttribute('data-cooltip', slideshowNextText);
 		setImgSize(rightImg);
 		app.LOUtil.setImage(rightImg, 'slideshow-slideNext.svg', this._map);
-		rightImg.addEventListener('click', this._onNextSlide);
+		rightImg.addEventListener('click', this._onPrevNextSlide);
 
 		const animationsImage = window.L.DomUtil.create(
 			'img',
@@ -740,18 +755,25 @@ class SlideShowPresenter {
 		);
 
 		if (this.isFollower()) {
-			const FollowImg = window.L.DomUtil.create('img', 'right-img', container);
-			FollowImg.id = 'follow';
-			const followText = _('Follow Presentation');
-			window.L.control.attachTooltipEventListener(FollowImg, this._map);
-			FollowImg.setAttribute('aria-label', followText);
-			FollowImg.setAttribute('data-cooltip', followText);
-			setImgSize(FollowImg);
-			app.LOUtil.setImage(FollowImg, 'slideshow-slideNext.svg', this._map);
-			FollowImg.addEventListener('click', (e: Event) => {
+			const followImg = window.L.DomUtil.create('img', 'right-img', container);
+			this._followBtn = followImg;
+			followImg.id = 'follow';
+			window.L.control.attachTooltipEventListener(followImg, this._map);
+			this.setFollowing(this.isFollowing());
+			setImgSize(followImg);
+			app.LOUtil.setImage(
+				followImg,
+				'slideshow-followPresenter.svg',
+				this._map,
+			);
+			followImg.addEventListener('click', (e: Event) => {
 				e.stopPropagation();
 				this._onA11yString(e.target);
-				this._slideShowNavigator.followLeaderSlide();
+				if (this.isFollowing()) {
+					this.setFollowing(false);
+				} else {
+					this._slideShowNavigator.followLeaderSlide();
+				}
 			});
 		}
 
@@ -988,7 +1010,7 @@ class SlideShowPresenter {
 		}
 
 		if (this._checkAlreadyPresenting()) {
-			this._notifyAlreadyPresenting();
+			if (!this._fromPresenterConsole) this._notifyAlreadyPresenting();
 			return false;
 		}
 
@@ -1287,6 +1309,19 @@ class SlideShowPresenter {
 
 	setFollowing(follow: boolean): void {
 		this._isFollowing = follow;
+		if (this._followBtn) {
+			if (follow) {
+				this._followBtn.classList.add('following');
+				const stopFollowText = _('Stop Following');
+				this._followBtn.setAttribute('aria-label', stopFollowText);
+				this._followBtn.setAttribute('data-cooltip', stopFollowText);
+			} else {
+				this._followBtn.classList.remove('following');
+				const followText = _('Follow Presenter');
+				this._followBtn.setAttribute('aria-label', followText);
+				this._followBtn.setAttribute('data-cooltip', followText);
+			}
+		}
 	}
 
 	isFollowing(): boolean {

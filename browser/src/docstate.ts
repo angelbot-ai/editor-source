@@ -15,7 +15,7 @@
 		* app.sectionContainer.addSection(new app.definitions.CellFillMarkerSection());
 		* var cellFillSection = new app.definitions.CellFillMarkerSection();
 */
-window.app = {
+(window.app as any) = {
 	/*
 	 * These are from <vcl/keycodes.h>. Correspond to the published
 	 * com::sun::star::awt::KeyModifier constants, left-shifted by 12.
@@ -57,8 +57,13 @@ window.app = {
 	},
 	impress: {
 		partList: null, // Info for parts.
+		hasOverviewPage: false, //Whether the file has an overview page
 		notesMode: false, // Opposite of "NormalMultiPaneGUI".
 		twipsCorrection: 0.567, // There is a constant ratio between tiletwips and impress page twips. For now, this seems safe to use.
+	},
+	writer: {
+		compareDocumentProperties: null,
+		compareDocumentOldFileName: null,
 	},
 	map: null, // Make map object a part of this.
 	util: null, // Attach the Util class.
@@ -292,6 +297,17 @@ window.app = {
 	// Below are only used for Cypress tests
 	allDialogs: undefined, // List of UNO commands for dialogs
 	a11yValidator: undefined, // Accessibility validator
+	serverInfo: {
+		coolwsdVersion: '',
+		coolwsdHash: '',
+		lokitVersionName: '',
+		lokitVersionNumber: '',
+		lokitVersionSuffix: '',
+		lokitHash: '',
+		serverId: '',
+		osInfo: '',
+		wsdOptions: '',
+	},
 };
 
 var activateValidation = false;

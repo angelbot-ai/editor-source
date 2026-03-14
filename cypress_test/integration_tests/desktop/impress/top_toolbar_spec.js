@@ -16,7 +16,10 @@ describe(['tagdesktop', 'tagnextcloud', 'tagproxy'], 'Top toolbar tests.', funct
 			desktopHelper.hideSidebarImpress();
 		}
 
-		cy.wait(1000);
+		cy.getFrameWindow().then((win) => {
+			this.win = win;
+			helper.processToIdle(win);
+		});
 
 		impressHelper.selectTextShapeInTheCenter();
 	});
@@ -54,6 +57,7 @@ describe(['tagdesktop', 'tagnextcloud', 'tagproxy'], 'Top toolbar tests.', funct
 	});
 
 	it('Apply font color on text shape.', function() {
+		desktopHelper.getCompactIconArrow('FontColor').click();
 		desktopHelper.getCompactIconArrow('Color').click();
 		desktopHelper.selectColorFromPalette('FFFF00');
 
@@ -63,6 +67,7 @@ describe(['tagdesktop', 'tagnextcloud', 'tagproxy'], 'Top toolbar tests.', funct
 	});
 
 	it('Apply highlight color on text shape.', function() {
+		desktopHelper.getCompactIconArrow('FontColor').click();
 		desktopHelper.getCompactIconArrow('CharBackColor').click();
 		desktopHelper.selectColorFromPalette('FFBF00');
 
@@ -158,11 +163,13 @@ describe(['tagdesktop', 'tagnextcloud', 'tagproxy'], 'Top toolbar tests.', funct
 		cy.cGet('#target-input').type('www.something.com');
 		cy.cGet('#ok').click();
 
+		helper.processToIdle(this.win);
+
 		impressHelper.removeShapeSelection();
 
 		// Ctrl-click to open hyperlink pop-up
 		impressHelper.clickCenterOfSlide( {ctrlKey: true} );
-		cy.wait(500);
+		helper.processToIdle(this.win);
 
 		cy.cGet('[id^="info-modal-label2"]').should('have.text', 'http://www.something.com/');
 		cy.cGet('#openlink-response').should('exist');

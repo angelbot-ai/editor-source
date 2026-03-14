@@ -1,13 +1,14 @@
 # Stratos Kostidis <petros8280@hotmail.com>, 2021.
 # george kitsoukakis <norhorn@gmail.com>, 2021.
 # GiannosOB <giannos2105@gmail.com>, 2025.
+# Deleted User <noreply+110771@weblate.org>, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-17 08:08+0200\n"
-"PO-Revision-Date: 2025-04-24 15:52+0000\n"
-"Last-Translator: GiannosOB <giannos2105@gmail.com>\n"
+"POT-Creation-Date: 2026-02-13 19:20+0200\n"
+"PO-Revision-Date: 2026-02-03 13:26+0000\n"
+"Last-Translator: Anonymous <noreply@weblate.org>\n"
 "Language-Team: Greek <https://hosted.weblate.org/projects/collabora-online/"
 "app-store-descriptions/el/>\n"
 "Language: el\n"

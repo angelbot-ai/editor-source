@@ -46,6 +46,7 @@ JSDialog.comboboxEntry = function (parentContainer, data, builder) {
 	var entry = window.L.DomUtil.create('div', 'ui-combobox-entry ' + builder.options.cssClass, parentContainer);
 	entry.id = data.id;
 	entry.setAttribute('role', 'option');
+	entry.setAttribute('tabindex', '-1');
 
 	if (data.hasSubMenu)
 		window.L.DomUtil.addClass(entry, 'ui-has-menu');
@@ -73,6 +74,8 @@ JSDialog.comboboxEntry = function (parentContainer, data, builder) {
     if (data.selected) {
         entry.setAttribute('aria-selected', 'true');
 		window.L.DomUtil.addClass(entry, 'selected');
+    } else {
+        entry.setAttribute('aria-selected', 'false');
     }
 
 	if (data.checked)
@@ -93,6 +96,13 @@ JSDialog.comboboxEntry = function (parentContainer, data, builder) {
 	entry.addEventListener('keypress', function (event) {
         if (event.key === 'Enter' || event.key === ' ') {
 			clickFunction();
+			event.preventDefault();
+		}
+	});
+
+	entry.addEventListener('keydown', function (event) {
+        if (event.key === 'Tab') {
+			JSDialog.CloseDropdown(data.comboboxId);
 			event.preventDefault();
 		}
 	});
@@ -224,11 +234,9 @@ JSDialog.combobox = function (parentContainer, data, builder) {
 
 	var dropDownId = JSDialog.CreateDropdownEntriesId(data.id);
 	content.setAttribute('aria-expanded', false);
-	content.setAttribute('aria-controls', dropDownId);
 
 	var button = window.L.DomUtil.create('button', 'ui-combobox-button ' + builder.options.cssClass, container);
 	button.setAttribute('aria-expanded', false);
-	button.setAttribute('aria-controls', dropDownId);
 
 	const dataAriaLabel = data.aria && data.aria.label ? data.aria.label : '';
 	const buttonARIALabel = dataAriaLabel
@@ -248,6 +256,15 @@ JSDialog.combobox = function (parentContainer, data, builder) {
 	container._onDropDown = function (open) {
 		content.setAttribute('aria-expanded', open);
 		button.setAttribute('aria-expanded', open);
+
+		// Only set aria-controls when dropdown is open to avoid screen reader confusion
+		if (open) {
+			content.setAttribute('aria-controls', dropDownId);
+			button.setAttribute('aria-controls', dropDownId);
+		} else {
+			content.removeAttribute('aria-controls');
+			button.removeAttribute('aria-controls');
+		}
 	};
 
 	if (data.selectedCount > 0)
@@ -315,15 +332,19 @@ JSDialog.combobox = function (parentContainer, data, builder) {
 		var parentBuilder = builder;
 		var callback = function(objectType, eventType, object, data) {
 			// send command with correct WindowId (from parent, not dropdown)
+			let result;
 			if (eventType !== 'close')
-				parentBuilder.callback(objectType, eventType, object, data, parentBuilder);
+				result = parentBuilder.callback(objectType, eventType, object, data, parentBuilder);
 
 			// close after selection
 			if (eventType === 'selected') {
 				container.onSelect(_extractPos(data));
 				container.onSetText(_extractText(data));
 
-				JSDialog.CloseDropdown(comboboxId);
+				// Pass through if the parent callback has already set the focus
+				// somewhere that shouldn't be changed by the CloseDropdown, e.g.
+				// toolbar font name/size
+				JSDialog.CloseDropdown(comboboxId, result === 'focusHandled');
 			}
 
 			return true;

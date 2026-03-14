@@ -2,15 +2,15 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: core-de\n"
-"PO-Revision-Date: 2025-12-10 20:00+0000\n"
-"Last-Translator: Ettore Atalan <atalanttore@googlemail.com>\n"
+"PO-Revision-Date: 2026-02-14 19:12+0000\n"
+"Last-Translator: alxhu <hosted.weblate.org@alxhu.de>\n"
 "Language-Team: German <https://hosted.weblate.org/projects/collabora-online/"
 "lokit/de/>\n"
 "Language: de\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 5.15-dev\n"
+"X-Generator: Weblate 5.16-dev\n"
 
 #. ygDfy
 #: module_graphicfilter.ulf
@@ -294,13 +294,13 @@ msgstr "3D-_Schema:"
 #: cui/inc/strings.hrc:481
 msgctxt "REG_CALCDBFOCUS"
 msgid "Table Style focus"
-msgstr ""
+msgstr "Tabellenstil-Fokus"
 
 #. EPGtZ
 #: cui/uiconfig/ui/hyperlinkinternetpage.ui:64
 msgctxt "hyperlinkinternetpage|target_label"
 msgid "Link:"
-msgstr ""
+msgstr "Link:"
 
 #. gfELk
 #: cui/uiconfig/ui/pageformatpage.ui:260
@@ -332,7 +332,7 @@ msgstr "Klicken Sie auf das gewünschte Nummerierungsschema."
 #: cui/uiconfig/ui/pickoutlinepage.ui:44
 msgctxt "pickoutlinepage|extended_tip|pick_outline_iconview"
 msgid "Click the outline style that you want to use."
-msgstr ""
+msgstr "Klicken Sie auf den gewünschten Umrissstil."
 
 #. qpArp
 #: cui/uiconfig/ui/toolbarmodedialog.ui:124
@@ -366,12 +366,15 @@ msgid ""
 "End User License and Subscription Agreement; choose EULA to see exact "
 "details in English."
 msgstr ""
+"Das Binärpaket %PRODUCTNAME wird unter den Bedingungen der Endbenutzer-"
+"Lizenzvereinbarung zur Verfügung gestellt; wählen Sie EULA, um die genauen "
+"Details auf Englisch anzuzeigen."
 
 #. YHTHB
 #: sfx2/uiconfig/ui/templatepanel.ui:137
 msgctxt "templatepanel|accessible_name|watercan"
 msgid "Fill Format Mode"
-msgstr ""
+msgstr "Füllformatmodus"
 
 #. qvBEu
 #: sfx2/uiconfig/ui/templatepanel.ui:156
@@ -443,7 +446,7 @@ msgstr "Änderung wiederherstellen: $1"
 #: sw/inc/strings.hrc:1536
 msgctxt "STR_COMPAT_OPT_UNDERLINETRAILINGSPACE"
 msgid "Underline Word-compatible trailing blanks"
-msgstr ""
+msgstr "Mit Word kompatible nachgestellte Leerzeichen unterstreichen"
 
 #. B3rfb
 #: sw/uiconfig/swriter/ui/columnpage.ui:122
@@ -765,7 +768,7 @@ msgctxt ""
 "Label\n"
 "value.text"
 msgid "Current Sheet View"
-msgstr ""
+msgstr "Aktuelle Tabellenansicht"
 
 #. 3Ep4Y
 #: CalcCommands.xcu
@@ -785,7 +788,7 @@ msgctxt ""
 "Label\n"
 "value.text"
 msgid "Print Grid Lines"
-msgstr ""
+msgstr "Gitterlinien drucken"
 
 #. a35bF
 #: CalcCommands.xcu
@@ -795,7 +798,7 @@ msgctxt ""
 "Label\n"
 "value.text"
 msgid "New Sheet View"
-msgstr ""
+msgstr "Neu Tabellenansicht"
 
 #. AKfar
 #: CalcCommands.xcu
@@ -805,7 +808,7 @@ msgctxt ""
 "Label\n"
 "value.text"
 msgid "Remove Sheet View"
-msgstr ""
+msgstr "Tabellenansicht entfernen"
 
 #. M52nh
 #: CalcCommands.xcu
@@ -815,7 +818,7 @@ msgctxt ""
 "Label\n"
 "value.text"
 msgid "Switch To Next Sheet View"
-msgstr ""
+msgstr "Zur nächsten Tabellenansicht wechseln"
 
 #. qfgad
 #: CalcCommands.xcu
@@ -825,7 +828,7 @@ msgctxt ""
 "Label\n"
 "value.text"
 msgid "Switch To Previous Sheet View"
-msgstr ""
+msgstr "Zur vorherigen Tabellenansicht wechseln"
 
 #. FJEd2
 #: CalcCommands.xcu
@@ -835,7 +838,7 @@ msgctxt ""
 "Label\n"
 "value.text"
 msgid "Select Sheet View"
-msgstr ""
+msgstr "Tabellenansicht wechseln"
 
 #. vCsC3
 #: CalcCommands.xcu
@@ -845,7 +848,7 @@ msgctxt ""
 "Label\n"
 "value.text"
 msgid "Exit Sheet View"
-msgstr ""
+msgstr "Tabellenansicht Beenden"
 
 #. uuvrm
 #: ChartCommands.xcu
@@ -975,7 +978,7 @@ msgctxt ""
 "TooltipLabel\n"
 "value.text"
 msgid "Select Comment In The Navigator Window/Sidebar"
-msgstr ""
+msgstr "Kommentar im Navigatorfenster/in der Seitenleiste auswählen"
 
 #. 83Euq
 #: GenericCommands.xcu
@@ -1031,14 +1034,13 @@ msgstr ""
 
 #. kB8Ri
 #: Sidebar.xcu
-#, fuzzy
 msgctxt ""
 "Sidebar.xcu\n"
 "..Sidebar.Content.PanelList.ScDatabasePropertyPanel\n"
 "Title\n"
 "value.text"
 msgid "Table Style Options"
-msgstr "Stil-Aktionen"
+msgstr "Tabellenstil-Optionen"
 
 #. SYFXq
 #: Sidebar.xcu
@@ -1210,7 +1212,7 @@ msgstr ""
 #: sc/inc/globstr.hrc:211
 msgctxt "STR_TABLE_TOTAL"
 msgid "Summary"
-msgstr ""
+msgstr "Zusammenfassung"
 
 #. cG7BY
 #: sc/inc/globstr.hrc:594
@@ -2045,59 +2047,56 @@ msgstr "Umrandungsstil"
 #: sc/uiconfig/scalc/ui/sidebardatabase.ui:22
 msgctxt "sidebardatabase|chk_header_row"
 msgid "Show Header Row"
-msgstr ""
+msgstr "Kopfzeile anzeigen"
 
 #. ECtUM
 #: sc/uiconfig/scalc/ui/sidebardatabase.ui:36
+#, fuzzy
 msgctxt "sidebardatabase|chk_total_row"
 msgid "Show Total Row"
-msgstr ""
+msgstr "Gesamtzeile anzeigen"
 
 #. htZbK
 #: sc/uiconfig/scalc/ui/sidebardatabase.ui:50
 msgctxt "sidebardatabase|chk_filter_buttons"
 msgid "Show Filter Buttons"
-msgstr ""
+msgstr "Filter-Schaltflächen anzeigen"
 
 #. MjALC
 #: sc/uiconfig/scalc/ui/sidebardatabase.ui:86
 msgctxt "sidebardatabase|chk_banded_rows"
 msgid "Banded Rows"
-msgstr ""
+msgstr "Gestreifte Zeilen"
 
 #. GVkZ2
 #: sc/uiconfig/scalc/ui/sidebardatabase.ui:100
-#, fuzzy
 msgctxt "sidebardatabase|chk_banded_cols"
 msgid "Banded Columns"
-msgstr "Spalten"
+msgstr "Gestreifte Spalten"
 
 #. S4bop
 #: sc/uiconfig/scalc/ui/sidebardatabase.ui:114
-#, fuzzy
 msgctxt "sidebardatabase|chk_first_column"
 msgid "First Column"
-msgstr "Spalte"
+msgstr "Erste Spalte"
 
 #. QR56s
 #: sc/uiconfig/scalc/ui/sidebardatabase.ui:128
-#, fuzzy
 msgctxt "sidebardatabase|chk_last_column"
 msgid "Last Column"
-msgstr "Spalte"
+msgstr "Letzte Spalte"
 
 #. BJHqA
 #: sc/uiconfig/scalc/ui/sidebardatabase.ui:170
-#, fuzzy
 msgctxt "sidebardatabase|lbl_styles"
 msgid "Table Styles"
-msgstr "Stil aktualisieren"
+msgstr "Tabellenstile"
 
 #. er8nh
 #: sc/uiconfig/scalc/ui/sidebardatabase.ui:187
 msgctxt "sidebardatabase|none"
 msgid "None"
-msgstr ""
+msgstr "Kein"
 
 #. XXBL8
 #: sc/uiconfig/scalc/ui/sidebardatabase.ui:188
@@ -2469,4 +2468,4 @@ msgstr "Tabellenstilnamen"
 #: sc/uiconfig/scalc/ui/sidebardatabase.ui:252
 msgctxt "sidebardatabase|defaulttablestylenames"
 msgid "Default Table Style Names"
-msgstr ""
+msgstr "Standard-Tabellenstilnamen"

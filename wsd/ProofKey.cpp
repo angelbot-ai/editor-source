@@ -19,7 +19,6 @@
 #include <vector>
 
 #include <Poco/Base64Decoder.h>
-#include <Poco/Base64Encoder.h>
 #include <Poco/Crypto/RSADigestEngine.h>
 #include <Poco/Crypto/RSAKey.h>
 #include <Poco/LineEndingConverter.h>
@@ -71,18 +70,6 @@ std::vector<unsigned char> ToNetworkOrderBytes(const T& x)
 }
 
 } // namespace
-
-std::string Proof::BytesToBase64(const std::vector<unsigned char>& bytes)
-{
-    std::ostringstream oss;
-    // The signature generated contains CRLF line endings.
-    // Use a line ending converter to remove these CRLF
-    Poco::OutputLineEndingConverter lineEndingConv(oss, "");
-    Poco::Base64Encoder encoder(lineEndingConv);
-    encoder << std::string(bytes.begin(), bytes.end());
-    encoder.close();
-    return oss.str();
-}
 
 std::vector<unsigned char> Proof::Base64ToBytes(const std::string &str)
 {

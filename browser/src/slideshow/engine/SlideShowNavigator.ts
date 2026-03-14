@@ -199,6 +199,10 @@ class SlideShowNavigator {
 
 	switchSlide(nOffset: number, bSkipTransition: boolean) {
 		NAVDBG.print('SlideShowNavigator.switchSlide: nOffset: ' + nOffset);
+		if (this.currentSlide === undefined) {
+			NAVDBG.print('SlideShowNavigator.switchSlide: currentSlide undefined');
+			return;
+		}
 		this.displaySlide(this.currentSlide + nOffset, bSkipTransition);
 	}
 
@@ -246,6 +250,7 @@ class SlideShowNavigator {
 	}
 
 	followLeaderSlide() {
+		if (this.presenter.isFollowing()) return;
 		this.presenter.setFollowing(true);
 		// const currentEffect = this.currentLeaderEffect;
 		if (this.currentLeaderSlide === this.currentSlide)
@@ -517,6 +522,7 @@ class SlideShowNavigator {
 		if (handler) {
 			aEvent.preventDefault();
 			aEvent.stopPropagation();
+			if (this.presenter.isFollower()) this.presenter.setFollowing(false);
 			handler();
 		}
 	}

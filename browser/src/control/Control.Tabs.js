@@ -120,12 +120,18 @@ window.L.Control.Tabs = window.L.Control.extend({
 			},
 		};
 
-		if ((!window.mode.isMobile() && !this._map.isReadOnlyMode()) || window.mode.isTablet()) {
+		if (!window.mode.isMobile() || window.mode.isTablet()) {
+			var that = this;
 			window.L.installContextMenu({
 				selector: '.spreadsheet-tab',
 				className: 'cool-font',
-				items: this._menuItem,
-				zIndex: 1000
+				items: this._menuItem, // rewrite mutates
+				zIndex: 1000,
+				build: function() {
+					if (that._map.isReadOnlyMode())
+						return false;
+					return { }
+				}
 			});
 		}
 
@@ -205,8 +211,9 @@ window.L.Control.Tabs = window.L.Control.extend({
 					dropZoneIndicator.id = 'drop-zone-' + i;
 					var id = 'spreadsheet-tab' + i;
 					var tab = window.L.DomUtil.create('button', 'spreadsheet-tab', ssTabScroll);
-					window.L.DomUtil.create('div', 'lock', tab);
 					var label = window.L.DomUtil.create('div', '', tab);
+					window.L.DomUtil.create('div', 'lock', tab);
+					window.L.DomUtil.create('div', 'view-indicator', tab);
 					if (window.mode.isMobile() || window.mode.isTablet()) {
 						(new Hammer(tab, {recognizers: [[Hammer.Press]]}))
 							.on('press', function (j) {

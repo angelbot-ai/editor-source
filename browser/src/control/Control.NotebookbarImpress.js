@@ -490,7 +490,7 @@ window.L.Control.NotebookbarImpress = window.L.Control.NotebookbarWriter.extend(
 			  {
 					'id': 'slide-presentation-in-console',
 					'type': 'bigcustomtoolitem',
-					'text': _('Presenter Console'),
+					'text': _('Presenter View'),
 					'command': 'presenterconsole',
 					'accessibility': { focusBack: true, combination: 'PC', de: null }
 				}: {},
@@ -498,7 +498,7 @@ window.L.Control.NotebookbarImpress = window.L.Control.NotebookbarWriter.extend(
 				{
 					'id': 'slide-presentation-follow-me',
 					'type': 'bigcustomtoolitem',
-					'text': _('Start Follow-me Presentation'),
+					'text': _('Present to All'),
 					'command': 'followmepresentation',
 					'accessibility': { focusBack: true, combination: 'PL', de: null }
 				} : {},
@@ -506,7 +506,7 @@ window.L.Control.NotebookbarImpress = window.L.Control.NotebookbarWriter.extend(
 				{
 					'id': 'slide-presentation-follow',
 					'type': 'bigcustomtoolitem',
-					'text': _('Follow Presentation'),
+					'text': _('Follow Presenter'),
 					'command': 'followpresentation',
 					'accessibility': { focusBack: true, combination: 'PF', de: null }
 				} : {},
@@ -1260,7 +1260,7 @@ window.L.Control.NotebookbarImpress = window.L.Control.NotebookbarWriter.extend(
 			{ type: 'separator', id: 'home-insertobjectchart-break', orientation: 'vertical' },
 			{
 				'type': 'overflowgroup',
-				'id': 'home-search',
+				'id': 'home-find-n-filter',
 				'name':_('Search'),
 				'accessibility': { focusBack: true, combination: 'SS', de: null },
 				'children' : [
@@ -1302,7 +1302,6 @@ window.L.Control.NotebookbarImpress = window.L.Control.NotebookbarWriter.extend(
 	},
 
 	getFormatTab: function() {
-		const isODF = app.LOUtil.isFileODF(this.map);
 		var content = [
 			{
 				'type': 'overflowgroup',
@@ -1395,15 +1394,6 @@ window.L.Control.NotebookbarImpress = window.L.Control.NotebookbarWriter.extend(
 					}
 				],
 				'vertical': 'true'
-			},
-			{ type: 'separator', id: 'format-namedescription-break', orientation: 'vertical', 'visible': isODF && app.isExperimentalMode() },
-			{
-				'id': 'format-shuffle-pages',
-				'type': 'bigtoolitem',
-				'text': _UNO('.uno:ReshufflePages', 'presentation'),
-				'command': '.uno:ReshufflePages',
-				'visible': isODF && app.isExperimentalMode(),
-				'accessibility': { focusBack: true, combination: 'RP', de: null }
 			},
 		];
 
@@ -1814,13 +1804,26 @@ window.L.Control.NotebookbarImpress = window.L.Control.NotebookbarWriter.extend(
 			},
 			{ type: 'separator', id: 'design-masterslides-break', orientation: 'vertical' },
 			{
-				'id': 'design-theme-dialog',
-				'type': 'bigtoolitem',
-				'text': _UNO('.uno:ThemeDialog'),
-				'command': '.uno:ThemeDialog',
-				'accessibility': { focusBack: false, combination: 'J', de: null }
+				'id': 'themes-group',
+				'type': 'overflowgroup',
+				'name': _('Themes'),
+				'nofold': true,
+				'icon': 'lc_themesthames.svg',
+				'children': [
+					{
+						'id': 'iconview_theme_colors', // has to match core id
+						'type': 'iconview'
+					}
+				]
 			},
-			{ type: 'separator', id: 'design-themedialog-break', orientation: 'vertical' },
+			{
+				'id': 'add-theme-dialog',
+				'type': 'bigtoolitem',
+				'text': _UNO('.uno:AddTheme'),
+				'command': '.uno:AddTheme',
+				'accessibility': { focusBack: false, combination: 'AT', de: null }
+			},
+			{ type: 'separator', id: 'theme-break', orientation: 'vertical' },
 			{
 				'type': 'overflowgroup',
 				'id': 'design-slide-layout',

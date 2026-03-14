@@ -1,11 +1,11 @@
-# Andras Timar <andras.timar@collabora.com>, 2020, 2021, 2024.
+# Andras Timar <andras.timar@collabora.com>, 2020, 2021, 2024, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-17 08:08+0200\n"
-"PO-Revision-Date: 2024-08-20 05:32+0000\n"
-"Last-Translator: Andras Timar <andras.timar@collabora.com>\n"
+"POT-Creation-Date: 2026-02-13 19:20+0200\n"
+"PO-Revision-Date: 2026-02-03 12:10+0000\n"
+"Last-Translator: Anonymous <noreply@weblate.org>\n"
 "Language-Team: Hungarian <https://hosted.weblate.org/projects/collabora-"
 "online/app-store-descriptions/hu/>\n"
 "Language: hu\n"

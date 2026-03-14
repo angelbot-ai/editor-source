@@ -139,7 +139,7 @@ namespace Util
         /// Returns the time that has elapsed since starting, in the units required.
         /// Units defaults to milliseconds.
         template <typename T = std::chrono::milliseconds>
-        T
+        [[nodiscard]] T
         elapsed(std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now()) const
         {
             return std::chrono::duration_cast<T>(now - _startTime);
@@ -164,7 +164,7 @@ namespace Util
     public:
         SysStopwatch();
         void restart();
-        std::chrono::microseconds elapsedTime() const;
+        [[nodiscard]] std::chrono::microseconds elapsedTime() const;
 
     private:
         static void readTime(uint64_t &cpu, uint64_t &sys);
@@ -1011,8 +1011,8 @@ int main(int argc, char**argv)
             std::string mangled;
             std::string offset;
             std::string demangled;
-            std::string toString() const;
-            std::string toMangledString() const;
+            [[nodiscard]] std::string toString() const;
+            [[nodiscard]] std::string toMangledString() const;
             bool isDemangled() const { return !demangled.empty(); }
         };
 
@@ -1038,7 +1038,7 @@ int main(int argc, char**argv)
         std::ostream& send(std::ostream& os) const;
 
         /// Produces a string representation, one line per frame
-        std::string toString() const;
+        [[nodiscard]] std::string toString() const;
 
         /* constexpr */ size_t size() const { return _frames.size(); }
         /* constexpr */ const Symbol& operator[](size_t idx) const
@@ -1078,6 +1078,7 @@ int main(int argc, char**argv)
     template <typename Dst, typename Src, typename Enable = void>
     Dst convertChronoClock(const Src time)
     {
+        [[maybe_unused]] const auto prime = Dst::clock::now();
         const auto before = Src::clock::now();
         const auto now = Dst::clock::now();
         const auto after = Src::clock::now();
@@ -1334,27 +1335,6 @@ int main(int argc, char**argv)
         return std::string(s);
     }
 
-    /// Concatenate the given elements in a container to each other using
-    /// the delimiter of choice.
-    template <typename T, typename U = const char*>
-    inline std::string join(const T& elements, const U& delimiter)
-    {
-        std::ostringstream oss;
-        bool first = true;
-        for (const auto& elem : elements)
-        {
-            if (!first)
-            {
-                oss << delimiter;
-            }
-
-            oss << elem;
-            first = false;
-        }
-
-        return oss.str();
-    }
-
     // Create a ostringstream with desired ostream format set
     inline std::ostringstream makeDumpStateStream()
     {
@@ -1373,8 +1353,8 @@ int main(int argc, char**argv)
     }
 
     /// Stringify elements from a container of pairs with a delimiter to a stream.
-    template <typename S, typename T, typename... Delimiters>
-    void joinPair(S& stream, T&& container, Delimiters&&... delimiters)
+    template <std::ranges::forward_range T, typename... Delimiters>
+    void joinPair(std::ostream& stream, T&& container, Delimiters&&... delimiters)
     {
         unsigned i = 0;
         for (const auto& pair : container)
@@ -1389,7 +1369,7 @@ int main(int argc, char**argv)
     }
 
     /// Stringify elements from a container of pairs with a delimiter to string.
-    template <typename T, typename... Delimiters>
+    template <std::ranges::forward_range T, typename... Delimiters>
     std::string joinPair(T&& container, Delimiters&&... delimiters)
     {
         std::ostringstream oss;
@@ -1398,7 +1378,7 @@ int main(int argc, char**argv)
     }
 
     /// Stringify elements from a container of pairs with a delimiter to string.
-    template <typename T> std::string joinPair(T&& container)
+    template <std::ranges::forward_range T> std::string joinPair(T&& container)
     {
         std::ostringstream oss;
         joinPair(oss, std::forward<T>(container), " / ");
@@ -1447,7 +1427,18 @@ int main(int argc, char**argv)
     std::tm *time_t_to_localtime(std::time_t t, std::tm& tm);
     std::tm *time_t_to_gmtime(std::time_t t, std::tm& tm);
 
+    /// Base-64 encode the given input.
     std::string base64Encode(std::string_view input);
+    /// Base-64 encode the given input, stripping CRLF endings, if any.
+    std::string base64EncodeRemovingNewLines(const std::string_view& input);
+    inline std::string base64EncodeRemovingNewLines(const std::vector<unsigned char>& input)
+    {
+        return base64EncodeRemovingNewLines(
+            std::string_view(reinterpret_cast<const char*>(input.data()), input.size()));
+    }
+
+    /// Base-64 decode the given input.
+    std::string base64Decode(const std::string& input);
 
 } // end namespace Util
 

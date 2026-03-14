@@ -25,7 +25,6 @@
 #include <Poco/StreamCopier.h>
 #include <Poco/URI.h>
 #include <Poco/BinaryReader.h>
-#include <Poco/Base64Decoder.h>
 #if !MOBILEAPP
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/Net/HTTPSClientSession.h>
@@ -1050,33 +1049,38 @@ bool ChildSession::loadDocument(const StringVector& tokens)
 // attempt to shutdown threads, fork and execute in the background
 bool ChildSession::saveDocumentBackground([[maybe_unused]] const StringVector& tokens)
 {
-#if MOBILEAPP
+    if constexpr (!Util::isMobileApp())
+    {
+        LOG_TRC("Attempting background save");
+        _logUiSaveBackGroundTimeStart = std::chrono::steady_clock::now();
+
+        // Keep the session alive over the lifetime of an async save
+        if (_docManager->forkToSave(
+                [this, tokens]
+                {
+                    // Called back in the bgsave process: so do the save !
+
+                    // FIXME: re-directing our sockets perhaps over
+                    // a pipe to our parent process ?
+                    unoCommand(tokens);
+
+                    // FIXME: did we send our responses properly ? ...
+                    SigUtil::addActivity("async save process exiting");
+
+                    LOG_TRC("Finished synchronous background saving ...");
+                    // Next: we wait for an async UNO_COMMAND_RESULT on .uno:Save
+                    // cf. Document::handleSaveMessage.
+                },
+                getViewId()))
+        {
+            LOG_TRC("saveDocumentBackground returns successful start");
+            return true;
+        }
+
+        // fork failed
+    }
+
     return false;
-#else
-    LOG_TRC("Attempting background save");
-    _logUiSaveBackGroundTimeStart = std::chrono::steady_clock::now();
-
-    // Keep the session alive over the lifetime of an async save
-    if (!_docManager->forkToSave([this, tokens]{
-
-        // Called back in the bgsave process: so do the save !
-
-        // FIXME: re-directing our sockets perhaps over
-        // a pipe to our parent process ?
-        unoCommand(tokens);
-
-        // FIXME: did we send our responses properly ? ...
-        SigUtil::addActivity("async save process exiting");
-
-        LOG_TRC("Finished synchronous background saving ...");
-        // Next: we wait for an async UNO_COMMAND_RESULT on .uno:Save
-        // cf. Document::handleSaveMessage.
-    }, getViewId()))
-        return false; // fork failed
-
-    LOG_TRC("saveDocumentBackground returns successful start.");
-    return true;
-#endif // !MOBILEAPP
 }
 
 bool ChildSession::sendFontRendering(const StringVector& tokens)
@@ -1225,7 +1229,7 @@ bool ChildSession::getCommandValues(const StringVector& tokens)
         LOKitHelper::ScopedString values(getLOKitDocument()->getCommandValues(".uno:Redo"));
         LOKitHelper::ScopedString undo(getLOKitDocument()->getCommandValues(".uno:Undo"));
         std::ostringstream jsonTemplate;
-        jsonTemplate << "{\"commandName\":\".uno:DocumentRepair\",\"Redo\":"
+        jsonTemplate << R"({"commandName":".uno:DocumentRepair","Redo":)"
                      << (values.get() == nullptr ? "" : values.get())
                      << ",\"Undo\":" << (undo.get() == nullptr ? "" : undo.get()) << "}";
         std::string json = jsonTemplate.str();
@@ -1418,7 +1422,8 @@ bool ChildSession::downloadAs(const StringVector& tokens)
     const std::string tmpDir = FileUtil::createRandomDir(jailDoc);
     const std::string urlToSend = tmpDir + '/' + filenameParam.getFileName();
     const std::string url = jailDoc + urlToSend;
-    const std::string urlAnonym = jailDoc + tmpDir + '/' + Poco::Path(nameAnonym).getFileName();
+    const std::string filename = Poco::Path(nameAnonym).getFileName();
+    const std::string urlAnonym = jailDoc + tmpDir + '/' + filename;
 
     LOG_DBG("Calling LOK's saveAs with URL: ["
             << urlAnonym << "], Format: [" << (format.empty() ? "(nullptr)" : format.c_str())
@@ -1442,8 +1447,8 @@ bool ChildSession::downloadAs(const StringVector& tokens)
     _docManager->sendFrame(docBrokerMessage.c_str(), docBrokerMessage.length());
 
     // Send download id to the client
-    sendTextFrame("downloadas: downloadid=" + tmpDir +
-                  " port=" + std::to_string(ClientPortNumber) + " id=" + id);
+    sendTextFrame("downloadas: downloadid=" + tmpDir + " port=" + std::to_string(ClientPortNumber) +
+                  " id=" + id + " filename=" + filename);
 #endif
     return true;
 }
@@ -1814,6 +1819,8 @@ bool ChildSession::insertFile(const StringVector& tokens)
     if (type == "graphic" ||
         type == "graphicurl" ||
         type == "selectbackground" ||
+        type == "comparedocuments" ||
+        type == "comparedocumentsurl" ||
         type == "multimedia" ||
         type == "multimediaurl" )
     {
@@ -1821,12 +1828,13 @@ bool ChildSession::insertFile(const StringVector& tokens)
 
         if constexpr (!Util::isMobileApp())
         {
-            if (type == "graphic" || type == "selectbackground" || type == "multimedia")
+            if (type == "graphic" || type == "selectbackground" || type == "multimedia" ||
+                type == "comparedocuments")
             {
                 std::string jailDoc = getJailDocRoot();
                 url = "file://" + jailDoc + "insertfile/" + name;
             }
-            else if (type == "graphicurl" || type == "multimediaurl")
+            else if (type == "graphicurl" || type == "multimediaurl" || type == "comparedocumentsurl")
             {
                 URI::decode(name, url);
                 if (!Util::toLower(url).starts_with("http"))
@@ -1884,6 +1892,15 @@ bool ChildSession::insertFile(const StringVector& tokens)
                     "}"
                 "}"
             "}";
+        }
+        else if (type == "comparedocuments" || type == "comparedocumentsurl")
+        {
+            command = ".uno:CompareDocuments";
+            arguments = "{"
+                "\"URL\":{"
+                    "\"type\":\"string\","
+                    "\"value\":\"" + url + "\""
+                "}}";
         } else {
             command = (type == "selectbackground" ? ".uno:SelectBackground" : ".uno:InsertGraphic");
             arguments = "{"
@@ -2165,7 +2182,7 @@ bool ChildSession::contentControlEvent(const StringVector& tokens)
         sendTextFrameAndLogError("error: cmd=contentcontrolevent kind=syntax");
         return false;
     }
-    std::string arguments = "{\"type\":\"" + type + "\",";
+    std::string arguments = R"({"type":")" + type + "\",";
 
     if (type == "picture")
     {
@@ -2174,7 +2191,7 @@ bool ChildSession::contentControlEvent(const StringVector& tokens)
         {
             std::string jailDoc = getJailDocRoot();
             std::string url = "file://" + jailDoc + "insertfile/" + name;
-            arguments += "\"changed\":\"" + url + "\"}";
+            arguments += R"("changed":")" + url + "\"}";
         }
     }
     else if (type == "pictureurl")
@@ -2184,14 +2201,14 @@ bool ChildSession::contentControlEvent(const StringVector& tokens)
         {
             std::string url;
             URI::decode(name, url);
-            arguments = "{\"type\":\"picture\",\"changed\":\"" + url + "\"}";
+            arguments = R"({"type":"picture","changed":")" + url + "\"}";
         }
     }
     else if (type == "date" || type == "drop-down")
     {
         std::string data;
         getTokenString(tokens[2], "selected", data);
-        arguments += "\"selected\":\"" + data + "\"" + "}";
+        arguments += R"("selected":")" + data + "\"" + "}";
     }
 
     getLOKitDocument()->setView(_viewId);
@@ -2519,7 +2536,7 @@ bool ChildSession::renderNextSlideLayer(SlideCompressor& scomp, const unsigned w
                     json = JsonUtil::jsonToString(root);
                 }
 
-                std::string response = "slidelayer: " + json;
+                std::string response = "zstdslidelayer: " + json;
 
                 response += "\n";
 
@@ -2634,7 +2651,7 @@ bool ChildSession::renderSlide(const StringVector& tokens)
                                                            &bufferWidth, &bufferHeight,
                                                            renderBackground, renderMasterPage);
     if (!success) {
-        sendTextFrame("sliderenderingcomplete: {\"status\": \"fail\"}");
+        sendTextFrame(R"(sliderenderingcomplete: {"status": "fail"})");
         return false;
     }
 
@@ -3339,10 +3356,8 @@ bool ChildSession::getPresentationInfo()
 {
     getLOKitDocument()->setView(_viewId);
 
-    char* info = nullptr;
-    info = getLOKitDocument()->getPresentationInfo();
-    std::string data(info);
-    free(info);
+    LOKitHelper::ScopedString info(getLOKitDocument()->getPresentationInfo());
+    std::string data(info.get());
     sendTextFrame("presentationinfo: " + data);
     return true;
 }
@@ -3475,11 +3490,11 @@ std::string ChildSession::getBlockedCommandType(std::string command)
 bool ChildSession::sendProgressFrame(const char* id, const std::string& jsonProps,
                                      const std::string& forcedID)
 {
-    std::string msg = "progress: { \"id\":\"";
+    std::string msg = R"(progress: { "id":")";
     msg += id;
     msg += "\"";
     if (_docManager->isBackgroundSaveProcess())
-        msg += ", \"type\":\"bg\"";
+        msg += R"(, "type":"bg")";
     if (!jsonProps.empty())
     {
         msg += ", ";
@@ -3487,7 +3502,7 @@ bool ChildSession::sendProgressFrame(const char* id, const std::string& jsonProp
     }
     if (!forcedID.empty())
     {
-        msg += ", \"forceid\": \"" + forcedID + "\"";
+        msg += R"(, "forceid": ")" + forcedID + "\"";
     }
     msg += " }";
     return sendTextFrame(msg);
@@ -3747,7 +3762,8 @@ void ChildSession::loKitCallback(const int type, const std::string& payload)
         sendTextFrame("contextmenu: " + payload);
         break;
     case LOK_CALLBACK_STATUS_INDICATOR_START:
-        sendProgressFrame("start", std::string("\"text\": \"") + JsonUtil::escapeJSONValue(payload) + "\"");
+        sendProgressFrame("start",
+                          std::string(R"("text": ")") + JsonUtil::escapeJSONValue(payload) + "\"");
         break;
     case LOK_CALLBACK_STATUS_INDICATOR_SET_VALUE:
         sendProgressFrame("setvalue", std::string("\"value\": ") + payload);

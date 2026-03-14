@@ -124,7 +124,7 @@ void ChildProcess::setDocumentBroker(const std::shared_ptr<DocumentBroker>& docB
 
     if (UnitWSD::isUnitTesting())
     {
-        UnitWSD::get().onDocBrokerAttachKitProcess(docBroker->getDocKey(), getPid());
+        UNITWSD_CALL(onDocBrokerAttachKitProcess(docBroker->getDocKey(), getPid()));
     }
 }
 
@@ -216,7 +216,6 @@ DocumentBroker::DocumentBroker(ChildType type, const std::string& uri, const Poc
     , _stop(false)
     , _documentChangedInStorage(false)
     , _isViewFileExtension(false)
-    , _isViewSettingsAccessibilityEnabled(false)
     , _isViewSettingsUpdated(false)
     , _alwaysSaveOnExit(ConfigUtil::getConfigValue<bool>("per_document.always_save_on_exit", false))
     , _backgroundAutoSave(
@@ -237,10 +236,7 @@ DocumentBroker::DocumentBroker(ChildType type, const std::string& uri, const Poc
                                << "] created with docKey [" << _docKey
                                << "], always_save_on_exit: " << _alwaysSaveOnExit);
 
-    if (_unitWsd)
-    {
-        _unitWsd->onDocBrokerCreate(_docKey);
-    }
+    UNITWSD_CALL_INSTANCE(_unitWsd, onDocBrokerCreate(_docKey));
 }
 
 pid_t DocumentBroker::getPid() const { return _childProcess ? _childProcess->getPid() : 0; }
@@ -923,10 +919,7 @@ DocumentBroker::~DocumentBroker()
     _admin.rmDoc(_docKey);
 #endif
 
-    if (_unitWsd)
-    {
-        _unitWsd->DocBrokerDestroy(_docKey);
-    }
+    UNITWSD_CALL_INSTANCE(_unitWsd, DocBrokerDestroy(_docKey));
 }
 
 void DocumentBroker::joinThread()
@@ -995,10 +988,7 @@ bool DocumentBroker::download(
     {
         _docState.setStatus(DocumentState::Status::Downloading);
 
-        if(_unitWsd != nullptr)
-        {
-            _unitWsd->onPerfDocumentLoading();
-        }
+        UNITWSD_CALL_INSTANCE(_unitWsd, onPerfDocumentLoading());
 
         // Pass the public URI to storage as it needs to load using the token
         // and other storage-specific data provided in the URI.
@@ -1733,7 +1723,6 @@ void PresetsInstallTask::install(const Poco::JSON::Object::Ptr& settings,
 
 static std::string extractViewSettings(const std::string& viewSettingsPath,
                                        const std::shared_ptr<ClientSession>& session,
-                                       bool& _isViewSettingsAccessibilityEnabled,
                                        bool& _isViewSettingsUpdated)
 {
     std::string viewSettingsString;
@@ -1761,10 +1750,7 @@ static std::string extractViewSettings(const std::string& viewSettingsPath,
             }
         }
 
-        std::string accessibilityState, zoteroAPIKey, signatureCertificate, signatureKey, signatureCa;
-        JsonUtil::findJSONValue(viewSettings, "accessibilityState", accessibilityState);
-        _isViewSettingsAccessibilityEnabled = accessibilityState == "true";
-        session->setAccessibilityState(accessibilityState == "true");
+        std::string zoteroAPIKey, signatureCertificate, signatureKey, signatureCa;
 
         bool viewSettingsNeedUpdate = false;
 
@@ -1856,7 +1842,7 @@ void DocumentBroker::asyncInstallPresets(const std::shared_ptr<ClientSession>& s
             const std::string viewSettings = presetsPath + "viewsetting/viewsetting.json";
             if (FileUtil::Stat(viewSettings).exists())
             {
-                const std::string settings = extractViewSettings(viewSettings, session, _isViewSettingsAccessibilityEnabled, _isViewSettingsUpdated);
+                const std::string settings = extractViewSettings(viewSettings, session, _isViewSettingsUpdated);
                 session->sendTextFrame("viewsetting: " + settings);
             }
             forwardToChild(session, "addconfig");
@@ -1868,11 +1854,10 @@ void DocumentBroker::asyncInstallPresets(const std::shared_ptr<ClientSession>& s
             stop("configfailed");
         }
 
-        if (_unitWsd)
-            _unitWsd->onDocBrokerPresetsInstallEnd(success);
+        UNITWSD_CALL_INSTANCE(_unitWsd, onDocBrokerPresetsInstallEnd(success));
     };
-    if (_unitWsd)
-        _unitWsd->onDocBrokerPresetsInstallStart();
+
+    UNITWSD_CALL_INSTANCE(_unitWsd, onDocBrokerPresetsInstallStart());
     _asyncInstallTask = asyncInstallPresets(_poll, configId, userSettingsUri,
                                             presetsPath, session, installFinishedCB);
     _asyncInstallTask->appendCallback([selfWeak = weak_from_this(), this,
@@ -3145,8 +3130,7 @@ void DocumentBroker::handleUploadToStorageResponse(const StorageBase::UploadResu
                                      << ", previousUploadSuccessful: " << previousUploadSuccessful);
     _storageManager.setLastUploadResult(lastUploadSuccessful);
 
-    if (_unitWsd)
-        _unitWsd->onDocumentUploaded(lastUploadSuccessful);
+    UNITWSD_CALL_INSTANCE(_unitWsd, onDocumentUploaded(lastUploadSuccessful));
 
 #if !MOBILEAPP
     if (lastUploadSuccessful && !isModified())
@@ -3212,11 +3196,13 @@ void DocumentBroker::handleUploadToStorageFailed(const StorageBase::UploadResult
 
     if (uploadResult.getResult() == StorageBase::UploadResult::Result::TOO_LARGE)
     {
-        LOG_WRN("Got Entitity Too Large while uploading docKey ["
-                << _docKey << "] to URI [" << _uploadRequest->uriAnonym()
-                << "]. If a reverse-proxy is used, it might be misconfigured. Alternatively, the "
-                   "WOPI host might be low on disk or hitting a quota limit. Making all sessions "
-                   "on doc read-only and notifying clients.");
+        LOG_WRN(
+            "Got Entitity Too Large while uploading docKey ["
+            << _docKey << "] to URI [" << _uploadRequest->uriAnonym() << "] of "
+            << _storageManager.getSizeAsUploaded()
+            << " bytes. If a reverse-proxy is used, it might be misconfigured. Alternatively, the "
+               "WOPI host might be low on disk or hitting a quota limit. Making all sessions "
+               "on doc read-only and notifying clients.");
 
         // Make everyone readonly and tell everyone that the file is too large for the storage.
         for (const auto& sessionIt : _sessions)
@@ -3230,8 +3216,9 @@ void DocumentBroker::handleUploadToStorageFailed(const StorageBase::UploadResult
     else if (uploadResult.getResult() == StorageBase::UploadResult::Result::DISKFULL)
     {
         LOG_WRN("Disk full while uploading docKey ["
-                << _docKey << "] to URI [" << _uploadRequest->uriAnonym()
-                << "]. Making all sessions on doc read-only and notifying clients.");
+                << _docKey << "] to URI [" << _uploadRequest->uriAnonym() << "] of "
+                << _storageManager.getSizeAsUploaded()
+                << " bytes. Making all sessions on doc read-only and notifying clients.");
 
         // Make everyone readonly and tell everyone that storage is low on diskspace.
         for (const auto& sessionIt : _sessions)
@@ -3248,26 +3235,33 @@ void DocumentBroker::handleUploadToStorageFailed(const StorageBase::UploadResult
         const auto session = _uploadRequest->session();
         if (session)
         {
-            LOG_ERR("Cannot upload docKey ["
-                    << _docKey << "] to storage URI [" << _uploadRequest->uriAnonym()
-                    << "]. Invalid or expired access token. Notifying client and invalidating the "
-                       "authorization token of session ["
-                    << session->getId() << ']');
+            LOG_ERR(
+                "Cannot upload docKey ["
+                << _docKey << "] to storage URI [" << _uploadRequest->uriAnonym() << "] of "
+                << _storageManager.getSizeAsUploaded()
+                << " bytes. Invalid or expired access token. Notifying client and invalidating the "
+                   "authorization token of session ["
+                << session->getId() << ']');
             session->sendTextFrameAndLogError("error: cmd=storage kind=saveunauthorized");
             session->invalidateAuthorizationToken();
         }
         else
         {
             LOG_ERR("Cannot upload docKey ["
-                    << _docKey << "] to storage URI [" << _uploadRequest->uriAnonym()
-                    << "]. Invalid or expired access token. The client session is closed.");
+                    << _docKey << "] to storage URI [" << _uploadRequest->uriAnonym() << "] of "
+                    << _storageManager.getSizeAsUploaded()
+                    << " bytes. Invalid or expired access token. The client session is closed.");
         }
 
         broadcastSaveResult(false, "Invalid or expired access token");
     }
     else if (uploadResult.getResult() == StorageBase::UploadResult::Result::FAILED)
     {
-        LOG_DBG("Last upload failed: " << uploadResult.getReason());
+        // Likely timed out.
+        LOG_INF("Failed to upload docKey [" << _docKey << "] to storage URI ["
+                                            << _uploadRequest->uriAnonym() << "] of "
+                                            << _storageManager.getSizeAsUploaded()
+                                            << " bytes with reason: " << uploadResult.getReason());
 
         // Since we've failed to get a response, we cannot know if the
         // Storage has been updated. As such, we need to re-sync the
@@ -3283,7 +3277,9 @@ void DocumentBroker::handleUploadToStorageFailed(const StorageBase::UploadResult
     else if (uploadResult.getResult() == StorageBase::UploadResult::Result::DOC_CHANGED
              || uploadResult.getResult() == StorageBase::UploadResult::Result::CONFLICT)
     {
-        LOG_ERR("PutFile says that Document [" << _docKey << "] changed in storage");
+        LOG_ERR("PutFile failed for docKey ["
+                << _docKey << "] to storage URI [" << _uploadRequest->uriAnonym() << "] of "
+                << _storageManager.getSizeAsUploaded() << " bytes because it's changed in storage");
         broadcastSaveResult(false, "Conflict: Document changed in storage",
                             uploadResult.getReason());
         handleDocumentConflict();
@@ -3359,11 +3355,7 @@ void DocumentBroker::setLoaded()
                              << " KB, total PSS: " << Util::getProcessTreePss(Util::getProcessId())
                              << " KB");
 
-        if(_unitWsd != nullptr)
-        {
-            _unitWsd->onPerfDocumentLoaded();
-        }
-
+        UNITWSD_CALL_INSTANCE(_unitWsd, onPerfDocumentLoaded());
     }
 }
 
@@ -3384,7 +3376,7 @@ void DocumentBroker::onViewLoaded(const std::shared_ptr<ClientSession>& session)
     // A view loaded.
     if (UnitWSD::isUnitTesting())
     {
-        UnitWSD::get().onDocBrokerViewLoaded(getDocKey(), session);
+        UNITWSD_CALL(onDocBrokerViewLoaded(getDocKey(), session));
     }
 }
 
@@ -3910,8 +3902,7 @@ std::size_t DocumentBroker::addSession(const std::shared_ptr<ClientSession>& ses
                 " session [" << id << "] to docKey [" <<
                 _docKey << "] to have " << count << " sessions.");
 
-        if (_unitWsd)
-            _unitWsd->onDocBrokerAddSession(_docKey, session);
+        UNITWSD_CALL_INSTANCE(_unitWsd, onDocBrokerAddSession(_docKey, session));
 
         return count;
     }
@@ -4159,11 +4150,8 @@ void DocumentBroker::finalRemoveSession(const std::shared_ptr<ClientSession>& se
     const std::string sessionId = session->getId();
     try
     {
-        if (_unitWsd)
-        {
-            // Notify test code before removal.
-            _unitWsd->onDocBrokerRemoveSession(_docKey, session);
-        }
+        // Notify test code before removal.
+        UNITWSD_CALL_INSTANCE(_unitWsd, onDocBrokerRemoveSession(_docKey, session));
 
         const bool readonly = session->isReadOnly();
         session->dispose();
@@ -4437,6 +4425,7 @@ bool DocumentBroker::handleInput(const std::shared_ptr<Message>& message)
     if (COOLProtocol::getFirstToken(message->forwardToken(), '-') == "client")
     {
         if (message->firstTokenMatches("slidelayer:") ||
+            message->firstTokenMatches("zstdslidelayer:") ||
             message->firstTokenMatches("sliderenderingcomplete:"))
         {
             handleSlideLayerResponse(message);
@@ -4526,7 +4515,7 @@ bool DocumentBroker::handleInput(const std::shared_ptr<Message>& message)
 #if ENABLE_DEBUG
         else if (message->firstTokenMatches("unitresult:"))
         {
-            UnitWSD::get().processUnitResult(message->tokens());
+            UNITWSD_CALL(processUnitResult(message->tokens()));
         }
 #endif
         else
@@ -5170,17 +5159,22 @@ DocumentBroker::applySignViewSettings(const std::string& message,
     return finalMsg;
 }
 
-std::string DocumentBroker::applyViewAccessibility(const std::string& message,
+std::string DocumentBroker::applyBrowserAccessibility(const std::string& message,
                                                    const std::string& viewId)
 {
-    if (!_isViewSettingsAccessibilityEnabled)
-        return message;
-
+    bool accessibilityEnabled = false;
     const auto it = _sessions.find(viewId);
     if (it != _sessions.end())
-        it->second->sendTextFrame("lockaccessibilityon");
+    {
+        auto session = it->second;
+        auto json = session->getBrowserSettingJSON();
+        JsonUtil::findJSONValue(json, "accessibilityState", accessibilityEnabled);
+    }
     else
         LOG_WRN("Cannot lock accessibility on for ClientSession [" << viewId << ']');
+
+    if (!accessibilityEnabled)
+        return message;
 
     // Ensure accessibilityState=true is enabled. Overwrite accessibilityState=
     // if it exists, append otherwise.
@@ -5212,7 +5206,7 @@ std::string DocumentBroker::applyViewSetting(const std::string& message, const s
                                              const std::shared_ptr<ClientSession>& session)
 {
     std::string msgWithSignSettings = applySignViewSettings(message, session);
-    return applyViewAccessibility(msgWithSignSettings, viewId);
+    return applyBrowserAccessibility(msgWithSignSettings, viewId);
 }
 
 bool DocumentBroker::forwardToChild(const std::shared_ptr<ClientSession>& session,
@@ -5310,7 +5304,7 @@ bool DocumentBroker::forwardToClient(const std::shared_ptr<Message>& payload)
             // Broadcast to all.
             // Events could cause the removal of sessions.
             std::map<std::string, std::shared_ptr<ClientSession>> sessions(_sessions);
-            for (const auto& it : _sessions)
+            for (const auto& it : sessions)
             {
                 if (!it.second->inWaitDisconnected())
                     it.second->handleKitToClientMessage(payload);

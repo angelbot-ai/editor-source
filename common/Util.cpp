@@ -19,11 +19,13 @@
 #include "Util.hpp"
 #include "common/Common.hpp"
 
+#include <Poco/Base64Decoder.h>
 #include <Poco/Base64Encoder.h>
 #include <Poco/ConsoleChannel.h>
 #include <Poco/Exception.h>
 #include <Poco/Format.h>
 #include <Poco/HexBinaryEncoder.h>
+#include <Poco/LineEndingConverter.h>
 #include <Poco/TemporaryFile.h>
 #include <Poco/URI.h>
 #include <Poco/Util/Application.h>
@@ -372,7 +374,7 @@ namespace Util
         zstdVersion += std::to_string(ZSTD_VERSION_MINOR) + ".";
         zstdVersion += std::to_string(ZSTD_VERSION_RELEASE);
 
-        std::string json = "{ \"Version\":     \"" + version +
+        std::string json = R"({ "Version":     ")" + version +
                            "\", "
                            "\"Hash\":        \"" +
                            hash +
@@ -401,9 +403,9 @@ namespace Util
                            Util::getProcessIdentifier() + "\", ";
 
         if (!timezone.empty())
-            json += "\"TimeZone\":     \"" + timezone + "\", ";
+            json += R"("TimeZone":     ")" + timezone + "\", ";
 
-        json += "\"Options\":     \"" + std::string(enableExperimental ? " (E)" : "") + "\" }";
+        json += R"("Options":     ")" + std::string(enableExperimental ? " (E)" : "") + "\" }";
         return json;
     }
 
@@ -1015,6 +1017,26 @@ namespace Util
         encoder << input;
         encoder.close();
         return oss.str();
+    }
+
+    std::string base64EncodeRemovingNewLines(const std::string_view& input)
+    {
+        std::ostringstream oss;
+        // Use a line ending converter to remove these CRLF.
+        Poco::OutputLineEndingConverter lineEndingConv(oss, "");
+        Poco::Base64Encoder encoder(lineEndingConv);
+        encoder << input;
+        encoder.close();
+        return oss.str();
+    }
+
+    std::string base64Decode(const std::string& input)
+    {
+        std::istringstream istr(input);
+        std::string decoded;
+        Poco::Base64Decoder decoder(istr);
+        decoder >> decoded;
+        return decoded;
     }
 
 } // namespace Util

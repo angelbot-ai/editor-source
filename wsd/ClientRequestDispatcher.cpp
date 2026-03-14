@@ -912,7 +912,14 @@ bool allowedOriginByHost(const std::string& host, const std::string& actualOrigi
 
 template <typename T> bool allowedOrigin(const T& request, const RequestDetails& requestDetails)
 {
-    const std::string actualOrigin = request.get("Origin");
+    auto const it = request.find("Origin");
+    if (it == request.end())
+    {
+        LOG_ERR("Rejecting message with no Origin header");
+        return false;
+    }
+
+    const std::string actualOrigin = it->second;
     const ServerURL cnxDetails(requestDetails);
 
     if (net::sameOrigin(cnxDetails.getWebServerUrl(), actualOrigin))
@@ -994,7 +1001,11 @@ ClientRequestDispatcher::MessageResult ClientRequestDispatcher::handleMessage(Po
                                                                               ssize_t headerSize)
 {
     const bool closeConnection = !request.getKeepAlive(); // HTTP/1.1: closeConnection true w/ "Connection: close" only!
-    LOG_DBG("Handling request: " << request.getURI() << ", closeConnection " << closeConnection);
+    LOG_DBG("Handling request: " << request.getMethod() << request.getVersion() << ' '
+                                 << request.getURI() << ", content " << request.getContentLength64()
+                                 << ", chunked " << request.getChunkedTransferEncoding()
+                                 << ", closeConnection " << closeConnection << ", "
+                                 << [&](auto& log) { Util::joinPair(log, request, " / "); });
 
     // denotes whether the request has been served synchronously
     bool servedSync = false;
@@ -1255,11 +1266,15 @@ ClientRequestDispatcher::MessageResult ClientRequestDispatcher::handleMessage(Po
             return MessageResult::Ignore;
         }
     }
-    catch (const BadRequestException& ex)
+    catch (const BadRequestException& exc)
     {
-        LOG_ERR('#' << socket->getFD() << " bad request: ["
-                    << COOLProtocol::getAbbreviatedMessage(socket->getInBuffer())
-                    << "]: " << ex.what());
+        LOG_ERR("Bad request: " << request.getMethod() << request.getVersion() << ' '
+                                << request.getURI() << ", length: " << request.getContentLength64()
+                                << ", chunked: " << request.getChunkedTransferEncoding()
+                                << ", closeConnection " << closeConnection << ", " << [&](auto& log)
+                { Util::joinPair(log, request, " / "); } << ", socket-data: ["
+                                << COOLProtocol::getAbbreviatedMessage(socket->getInBuffer())
+                                << "]: " << exc.what());
 
         // Bad request.
         HttpHelper::sendErrorAndShutdown(http::StatusCode::BadRequest, socket);
@@ -1267,9 +1282,13 @@ ClientRequestDispatcher::MessageResult ClientRequestDispatcher::handleMessage(Po
     }
     catch (const std::exception& exc)
     {
-        LOG_ERR('#' << socket->getFD() << " Exception while processing incoming request: ["
-                    << COOLProtocol::getAbbreviatedMessage(socket->getInBuffer())
-                    << "]: " << exc.what());
+        LOG_ERR("Exception while processing incoming request: "
+                << request.getMethod() << request.getVersion() << ' ' << request.getURI()
+                << ", length: " << request.getContentLength64() << ", chunked: "
+                << request.getChunkedTransferEncoding() << ", closeConnection " << closeConnection
+                << ", " << [&](auto& log) { Util::joinPair(log, request, " / "); }
+                << ", socket-data: [" << COOLProtocol::getAbbreviatedMessage(socket->getInBuffer())
+                << "]: " << exc.what());
 
         // Bad request.
         // NOTE: Check _wsState to choose between HTTP response or WebSocket (app-level) error.
@@ -1359,17 +1378,19 @@ bool ClientRequestDispatcher::handleWopiDiscoveryRequest(
     LOG_DBG("Wopi discovery request: " << requestDetails.getURI());
 
     std::string xml = getFileContent("discovery.xml");
-    std::string srvUrl =
+    bool isSsl =
 #if ENABLE_SSL
-        ((ConfigUtil::isSslEnabled() || ConfigUtil::isSSLTermination()) ? "https://" : "http://")
+        (ConfigUtil::isSslEnabled() || ConfigUtil::isSSLTermination());
 #else
-        "http://"
+        false;
 #endif
+    std::string srvUrl = (isSsl ? "https://" : "http://")
         + (COOLWSD::ServerName.empty() ? requestDetails.getHostUntrusted() : COOLWSD::ServerName) +
         COOLWSD::ServiceRoot;
     if (requestDetails.isProxy())
         srvUrl = requestDetails.getProxyPrefix();
     Poco::replaceInPlace(xml, std::string("%SRV_URI%"), srvUrl);
+    Poco::replaceInPlace(xml, std::string("%SRV_PROTO%"), std::string(isSsl ? "https" : "http"));
 
     http::Response httpResponse(http::StatusCode::OK);
     FileServerRequestHandler::hstsHeaders(httpResponse);
@@ -1383,25 +1404,6 @@ bool ClientRequestDispatcher::handleWopiDiscoveryRequest(
     LOG_INF("Sent discovery.xml successfully.");
     return true;
 }
-
-
-// NB: these names are part of the published API, and should not be renamed or altered but can be expanded
-STATE_ENUM(CheckStatus,
-    Ok,
-    NotHttpSuccess,
-    HostNotFound,
-    WopiHostNotAllowed,
-    UnspecifiedError,
-    ConnectionAborted,
-    CertificateValidation,
-    SelfSignedCertificate,
-    ExpiredCertificate,
-    SslHandshakeFail,
-    MissingSsl,
-    NotHttps,
-    NoScheme,
-    Timeout,
-);
 
 void ClientRequestDispatcher::sendResult(const std::shared_ptr<StreamSocket>& socket, CheckStatus result)
 {
@@ -2794,6 +2796,12 @@ std::string getCapabilitiesJson(bool convertToAvailable)
 
     // Set the product version hash
     capabilities->set("productVersionHash", Util::getCoolVersionHash());
+
+    // Set the kit version
+    capabilities->set("productKitVersion", COOLWSD::LOKitVersionNumber);
+
+    // Set the kit version hash
+    capabilities->set("productKitVersionHash", COOLWSD::LOKitVersionHash);
 
     // Set that this is a proxy.php-enabled instance
     capabilities->set("hasProxyPrefix", COOLWSD::IsProxyPrefixEnabled);

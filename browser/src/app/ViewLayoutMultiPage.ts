@@ -9,10 +9,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-class ViewLayoutMultiPage extends ViewLayoutBase {
+class ViewLayoutMultiPage extends ViewLayoutNewBase {
 	public readonly type: string = 'ViewLayoutMultiPage';
 	public gapBetweenPages = 20; // Core pixels.
-	public availableWidth = 0;
 	private maxRowsSize = 2;
 	public documentRectangles = Array<cool.SimpleRectangle>();
 	private viewRectangles = Array<cool.SimpleRectangle>();
@@ -24,25 +23,27 @@ class ViewLayoutMultiPage extends ViewLayoutBase {
 		app.map.on('zoomend', this.reset.bind(this));
 
 		this.reset();
+		this.adjustViewZoomLevel();
 	}
 
-	public sendClientVisibleArea() {
-		const visibleAreaCommand =
-			'clientvisiblearea x=' +
-			this.viewedRectangle.x1 +
-			' y=' +
-			this.viewedRectangle.y1 +
-			' width=' +
-			this.viewedRectangle.width +
-			' height=' +
-			this.viewedRectangle.height;
+	public adjustViewZoomLevel() {
+		Util.ensureValue(app.activeDocument);
 
-		app.socket.sendMessage(visibleAreaCommand);
+		const min = 0.1;
+		const max = 10;
 
-		return new cool.Bounds(
-			new cool.Point(this.viewedRectangle.pX1, this.viewedRectangle.pY1),
-			new cool.Point(this.viewedRectangle.pX2, this.viewedRectangle.pY2),
-		);
+		const anchorSection = this.getDocumentAnchorSection();
+
+		// Take 50% of the width and try to render 2 pages side by side.
+		const halfWidth = Math.round(anchorSection.size[0] * 0.5);
+
+		const ratio = halfWidth / app.activeDocument.fileSize.pX;
+		let zoom = app.map.getScaleZoom(ratio);
+		zoom = Math.min(max, Math.max(min, zoom));
+
+		if (zoom > 1) zoom = Math.floor(zoom);
+
+		app.map.setZoom(zoom, { animate: false });
 	}
 
 	private resetViewLayout() {
@@ -173,38 +174,7 @@ class ViewLayoutMultiPage extends ViewLayoutBase {
 		return part;
 	}
 
-	private refreshCurrentCoordList() {
-		this.currentCoordList.length = 0;
-		const zoom = app.map.getZoom();
-
-		const columnCount = Math.ceil(
-			this._viewedRectangle.pWidth / TileManager.tileSize,
-		);
-		const rowCount = Math.ceil(
-			this._viewedRectangle.pHeight / TileManager.tileSize,
-		);
-		const startX =
-			Math.floor(this._viewedRectangle.pX1 / TileManager.tileSize) *
-			TileManager.tileSize;
-		const startY =
-			Math.floor(this._viewedRectangle.pY1 / TileManager.tileSize) *
-			TileManager.tileSize;
-
-		for (let i = 0; i < columnCount; i++) {
-			for (let j = 0; j < rowCount; j++) {
-				const coords = new TileCoordData(
-					startX + i * TileManager.tileSize,
-					startY + j * TileManager.tileSize,
-					zoom,
-					0,
-				);
-
-				if (coords.x >= 0 && coords.y >= 0) this.currentCoordList.push(coords);
-			}
-		}
-	}
-
-	private refreshVisibleAreaRectangle(): void {
+	protected refreshVisibleAreaRectangle(): void {
 		const documentAnchor = this.getDocumentAnchorSection();
 		const view = cool.SimpleRectangle.fromCorePixels([
 			this.scrollProperties.viewX,
@@ -238,15 +208,23 @@ class ViewLayoutMultiPage extends ViewLayoutBase {
 			}
 		}
 
-		resultingRectangle.pX1 -= TileManager.tileSize;
-		resultingRectangle.pY1 -= TileManager.tileSize;
-		resultingRectangle.pWidth += TileManager.tileSize * 2;
-		resultingRectangle.pHeight += TileManager.tileSize * 2;
+		if (
+			resultingRectangle.pX1 === Number.POSITIVE_INFINITY ||
+			resultingRectangle.pY1 === Number.POSITIVE_INFINITY
+		) {
+			app.layoutingService.appendLayoutingTask(() => {
+				this.scrollProperties.viewX = 0;
+				this.refreshVisibleAreaRectangle();
+			});
+		} else {
+			this._viewedRectangle = resultingRectangle;
 
-		this._viewedRectangle = resultingRectangle;
+			app.sectionContainer.onNewDocumentTopLeft();
+			app.sectionContainer.requestReDraw();
+		}
 	}
 
-	private updateViewData() {
+	protected updateViewData() {
 		if (!app.file.writer.pageRectangleList.length) return;
 
 		this.refreshVisibleAreaRectangle();
@@ -254,6 +232,7 @@ class ViewLayoutMultiPage extends ViewLayoutBase {
 		if (app.map._docLayer?._cursorMarker)
 			app.map._docLayer._cursorMarker.update();
 
+		app.map._docLayer._sendClientZoom();
 		this.sendClientVisibleArea();
 
 		this.refreshCurrentCoordList();
@@ -298,67 +277,15 @@ class ViewLayoutMultiPage extends ViewLayoutBase {
 		return result;
 	}
 
-	public refreshScrollProperties(): any {
-		const documentAnchor = this.getDocumentAnchorSection();
-
-		// The length of the railway that the scroll bar moves on up & down or left & right.
-		this.scrollProperties.horizontalScrollLength = documentAnchor.size[0];
-		this.scrollProperties.verticalScrollLength = documentAnchor.size[1];
-
-		// Sizes of the scroll bars.
-		this.calculateTheScrollSizes();
-
-		// Properties for quick scrolling.
-		this.scrollProperties.verticalScrollStep = documentAnchor.size[1] / 2;
-		this.scrollProperties.horizontalScrollStep = documentAnchor.size[0] / 2;
-	}
-
-	public scroll(pX: number, pY: number): void {
-		this.refreshScrollProperties();
-		const documentAnchor = this.getDocumentAnchorSection();
-		let scrolled = false;
-
-		if (pX !== 0 && this.canScrollHorizontal(documentAnchor)) {
-			const max =
-				this.scrollProperties.horizontalScrollLength -
-				this.scrollProperties.horizontalScrollSize;
-			const min = 0;
-			const current = this.scrollProperties.startX + pX;
-			const endPosition = Math.max(min, Math.min(max, current));
-
-			if (endPosition !== this.scrollProperties.startX) {
-				this.scrollProperties.startX = endPosition;
-				this.scrollProperties.viewX = Math.round(
-					(endPosition / this.scrollProperties.horizontalScrollLength) *
-						this.viewSize.pX,
-				);
-				scrolled = true;
-			}
-		}
-
-		if (pY !== 0 && this.canScrollVertical(documentAnchor)) {
-			const max =
-				this.scrollProperties.verticalScrollLength -
-				this.scrollProperties.verticalScrollSize;
-			const min = 0;
-			const current = this.scrollProperties.startY + pY;
-			const endPosition = Math.max(min, Math.min(max, current));
-
-			if (endPosition !== this.scrollProperties.startY) {
-				this.scrollProperties.startY = endPosition;
-				this.scrollProperties.viewY = Math.round(
-					(endPosition / this.scrollProperties.verticalScrollLength) *
-						this.viewSize.pY,
-				);
-				scrolled = true;
-			}
-		}
+	public scroll(pX: number, pY: number): boolean {
+		const scrolled = super.scroll(pX, pY);
 
 		if (scrolled) {
-			this.sendClientVisibleArea();
 			this.updateViewData();
 			app.sectionContainer.requestReDraw();
 		}
+
+		return scrolled;
 	}
 
 	public scrollTo(pX: number, pY: number): void {
@@ -412,19 +339,17 @@ class ViewLayoutMultiPage extends ViewLayoutBase {
 		this.updateViewData();
 	}
 
-	public get viewSize() {
-		return this._viewSize;
-	}
+	public getTotalSideSpace() {
+		const maxX: number = this.viewRectangles.reduce((result, currentItem) => {
+			return Math.max(currentItem.pX2, result);
+		}, 0);
+		const minX: number = this.viewRectangles.reduce((result, currentItem) => {
+			return Math.min(currentItem.pX1, result);
+		}, 100000);
+		const width = maxX - minX;
 
-	public set viewSize(size: cool.SimplePoint) {
-		return; // Disable setting the size externally.
-	}
+		const sideSpace = this.viewSize.pX - width;
 
-	public get viewedRectangle() {
-		return this._viewedRectangle;
-	}
-
-	public set viewedRectangle(rectangle: cool.SimpleRectangle) {
-		return; // Disable setting the viewed rectangle externally.
+		return sideSpace;
 	}
 }

@@ -89,21 +89,15 @@ void KitQueue::put(const Payload& value)
         _queue.emplace_back(value);
 }
 
-std::vector<TileDesc>* KitQueue::getTileQueue(CanonicalViewId viewid)
+std::vector<TileDesc>& KitQueue::ensureTileQueue(CanonicalViewId viewid)
 {
     for (auto& queue : _tileQueues)
     {
         if (queue.first == viewid)
-            return &queue.second;
+            return queue.second;
     }
-    return nullptr;
-}
 
-std::vector<TileDesc>& KitQueue::ensureTileQueue(CanonicalViewId viewid)
-{
-    std::vector<TileDesc>* tileQueue = getTileQueue(viewid);
-    if (tileQueue)
-        return *tileQueue;
+    // Create and return a new one.
     return _tileQueues.emplace_back(viewid, std::vector<TileDesc>()).second;
 }
 
@@ -617,29 +611,26 @@ TileCombined KitQueue::popTileQueue(std::vector<TileDesc>& tileQueue, TilePriori
 
     LOG_TRC("KitQueue depth: " << tileQueue.size());
 
-    TileDesc msg = tileQueue.front();
-
     // vector of tiles we will render
     std::vector<TileDesc> tiles;
 
     // We are handling a tile; first try to find one that is at the cursor's
     // position, otherwise handle the one that is at the front
     int prioritized = 0;
-    TilePrioritizer::Priority prioritySoFar = TilePrioritizer::Priority::NONE;
-    for (size_t i = 0; i < tileQueue.size(); ++i)
+    priority = _prio.getTilePriority(tileQueue[0]);
+    for (std::size_t i = 1; i < tileQueue.size(); ++i)
     {
-        auto& prio = tileQueue[i];
+        const auto& tile = tileQueue[i];
 
-        const TilePrioritizer::Priority p = _prio.getTilePriority(prio);
-        if (p > prioritySoFar)
+        const TilePrioritizer::Priority p = _prio.getTilePriority(tile);
+        if (p > priority)
         {
-            prioritySoFar = p;
-            prioritized = i;
-            msg = prio;
+            priority = p;
+            prioritized = static_cast<int>(i);
         }
     }
 
-    priority = prioritySoFar;
+    const TileDesc msg = tileQueue[prioritized];
 
     LOG_TRC("Priority tile: " << msg.serialize() <<
             " x-grid=" << msg.getTilePosX() / msg.getTileWidth() <<
@@ -753,7 +744,7 @@ void KitQueue::pushTileCombineRequest(const Payload &value)
 
     // Breakup tilecombine and deduplicate (we are re-combining
     // the tiles inside popTileQueue() again)
-    const std::string msg = std::string(value.data(), value.size());
+    const std::string_view msg(value.data(), value.size());
     const TileCombined tileCombined = TileCombined::parse(msg);
 
     std::vector<TileDesc>& tileQueue = ensureTileQueue(tileCombined.getCanonicalViewId());
@@ -765,7 +756,7 @@ void KitQueue::pushTileCombineRequest(const Payload &value)
 
 void KitQueue::pushTileQueue(const Payload &value)
 {
-    const std::string msg = std::string(value.data(), value.size());
+    const std::string_view msg(value.data(), value.size());
     const TileDesc desc = TileDesc::parse(msg);
     std::vector<TileDesc>& tileQueue = ensureTileQueue(desc.getCanonicalViewId());
     sortedInsert(tileQueue, desc);
@@ -779,16 +770,6 @@ size_t KitQueue::getTileQueueSize() const
         queuedTiles += queue.second.size();
 
     return queuedTiles;
-}
-
-bool KitQueue::isTileQueueEmpty() const
-{
-    for (const auto& queue : _tileQueues)
-    {
-        if (!queue.second.empty())
-            return false;
-    }
-    return true;
 }
 
 std::string KitQueue::combineRemoveText(const StringVector& tokens)

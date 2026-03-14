@@ -16,6 +16,27 @@ describe(['tagdesktop'], 'Notebookbar tests.', function() {
 		}
 
 		writerHelper.selectAllTextOfDoc();
+		cy.getFrameWindow().then((win) => {
+			this.win = win;
+		});
+	});
+
+	function checkCollapsedGroups() {
+		// check if dropdown arrows exist for groups
+		desktopHelper.getNbIconArrow('Grow');
+		desktopHelper.getNbIconArrow('DefaultBullet');
+		desktopHelper.getNbIconArrow('InsertTable');
+		cy.cGet('.home-search .arrowbackground');
+	}
+
+	it('Check collapsed state after mode switch', function() {
+		cy.viewport(1280, 600);
+		helper.processToIdle(this.win); // stabilize
+
+		checkCollapsedGroups();
+		desktopHelper.switchUIToCompact();
+		desktopHelper.switchUIToNotebookbar();
+		checkCollapsedGroups();
 	});
 
 	it('Apply bold font from dropdown in Format tab', function() {
@@ -89,6 +110,13 @@ describe(['tagdesktop'], 'Notebookbar checkbox widgets', function() {
 			cy.wait(1000);
 			cy.get('@x1').should('not.be.equal', x);
 		});
+
+		// Check that there are no tab stops.
+		cy.cGet('.cool-ruler-tabstop-left').should('not.exist');
+		// Add a tab stop with a double click.
+		cy.cGet('.cool-ruler-horizontal-tabstopcontainer').dblclick();
+		// Check that a new tab stop is added.
+		cy.cGet('.cool-ruler-tabstop-left').should('exist');
 
 		cy.cGet('#showruler-input').uncheck();
 		cy.cGet('#showruler-input').should('not.be.checked');

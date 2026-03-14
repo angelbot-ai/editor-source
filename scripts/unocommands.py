@@ -96,7 +96,7 @@ def extractContextCommands(path):
     commands = []
 
     # extract from the comments whitelist
-    f = open(path + '/browser/src/control/Control.ContextMenu.js', 'r', encoding='utf-8')
+    f = open(path + '/browser/src/control/jsdialog/Definitions.MenuCommands.ts', 'r', encoding='utf-8')
     readingCommands = False
     for line in f:
         if line.find('UNOCOMMANDS_EXTRACT_START') >= 0:
@@ -164,6 +164,11 @@ def extractToolbarCommands(path):
             commands += commandFromMenuLine(line)
 
     f = open(path + '/browser/src/control/Control.NotebookbarWriter.js', 'r', encoding='utf-8')
+    for line in f:
+        if line.find("_UNO(") >= 0:
+            commands += commandFromMenuLine(line)
+
+    f = open(path + '/browser/src/control/Notebookbar.WriterReferencesTab.ts', 'r', encoding='utf-8')
     for line in f:
         if line.find("_UNO(") >= 0:
             commands += commandFromMenuLine(line)

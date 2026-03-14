@@ -423,6 +423,7 @@ window.L.Control.NotebookbarWriter = window.L.Control.Notebookbar.extend({
 		var hasFeedback = this.map.feedback;
 		var hasAccessibilitySupport = window.enableAccessibility;
 		var hasAccessibilityCheck = this.map.getDocType() === 'text';
+		const isDebugOn = this.map._debug.debugOn;
 		var hasAbout = window.L.DomUtil.get('about-dialog') !== null;
 		var hasServerAudit = this.getHiddenItems() ? !this.getHiddenItems().includes('server-audit') : true;
 
@@ -465,9 +466,25 @@ window.L.Control.NotebookbarWriter = window.L.Control.Notebookbar.extend({
 						'id': 'accessibility-check',
 						'class': 'unoAccessibilityCheck',
 						'type': 'bigtoolitem',
-						'text': _UNO('.uno:AccessibilityCheck', 'text'),
+						'text': _UNO('.uno:AccessibilityCheck', 'text', true),
 						'command': '.uno:SidebarDeck.A11yCheckDeck',
 						'accessibility': { focusBack: false, combination: 'A', de: null }
+					} : {},
+				hasAccessibilityCheck ?
+					{
+						'id': 'validatesidebara11y',
+						'type': 'bigcustomtoolitem',
+						'text': _('Validate Sidebar'),
+						'visible': isDebugOn ? 'true' : 'false',
+						'accessibility': { focusBack: true,	combination: 'VS', de: null }
+					} : {},
+				hasAccessibilityCheck ?
+					{
+						'id': 'validatedialogsa11y',
+						'type': 'bigcustomtoolitem',
+						'text': _('Validate Dialog'),
+						'visible': isDebugOn ? 'true' : 'false',
+						'accessibility': { focusBack: true,	combination: 'VD', de: null }
 					} : {},
 				hasAccessibilitySupport || hasAccessibilityCheck ?
 					{
@@ -958,7 +975,7 @@ window.L.Control.NotebookbarWriter = window.L.Control.Notebookbar.extend({
 			{ type: 'separator', id: 'home-charmapcontrol-break', orientation: 'vertical' },
 			{
 				'type': 'overflowgroup',
-				'id': 'home-search',
+				'id': 'home-find-n-filter',
 				'name': _('Search'),
 				'accessibility': { focusBack: false,	combination: 'SS',	de: 'SS' },
 				'children': [
@@ -1609,18 +1626,18 @@ window.L.Control.NotebookbarWriter = window.L.Control.Notebookbar.extend({
 				'accessibility': { focusBack: false, combination: 'F', de: 'E' },
 				'children' : [
 					{
-						'id': 'fullscreen',
-						'type': 'bigtoolitem',
-						'text': _UNO('.uno:FullScreen'),
-						'command': '.uno:FullScreen',
-						'accessibility': { focusBack: true, combination: 'F', de: 'E' }
-					},
-					{
 						'id': 'zoomreset',
 						'class': 'unozoomreset',
 						'type': 'bigcustomtoolitem',
-						'text': _('Reset zoom'),
-						'accessibility': { focusBack: true, combination: 'J', de: 'O' }
+						'text': '100%',
+						'accessibility': { focusBack: true, combination: 'Q', de: 'O' }
+					},
+					{
+						'id': 'fitwidthzoom',
+						'class': 'unofitwidthzoom',
+						'type': 'bigcustomtoolitem',
+						'text': _('Page Width'),
+						'accessibility': { focusBack: true, combination: 'J', de: 'Ö' }
 					},
 					{
 						'type': 'container',
@@ -1765,7 +1782,7 @@ window.L.Control.NotebookbarWriter = window.L.Control.Notebookbar.extend({
 					{
 						'id': 'Layout-OrientationMenu:MenuOrientation',
 						'type': 'menubutton',
-						'text': _UNO('.uno:Orientation'),
+						'text': _UNO('.uno:Orientation', 'text'),
 						'enabled': 'true',
 						'accessibility': { focusBack: true, combination: 'O', de: '4' }
 					}
@@ -2275,6 +2292,13 @@ window.L.Control.NotebookbarWriter = window.L.Control.Notebookbar.extend({
 						'accessibility': { focusBack: true, combination: 'SC', de: null }
 					},
 					{
+						'id': 'compare-tracked-change',
+						'type': 'bigcustomtoolitem',
+						'text': _('View Changes'),
+						'command': 'comparechanges',
+						'accessibility': { focusBack: true, combination: 'CC' }
+					},
+					{
 						'type': 'container',
 						'children': [
 							{
@@ -2353,11 +2377,19 @@ window.L.Control.NotebookbarWriter = window.L.Control.Notebookbar.extend({
 				]
 			},
 			{ type: 'separator', id: 'review-accepttrackedchanges-break', orientation: 'vertical' },
+			hideChangeTrackingControls ? {} : {
+				'id': 'review-compare:CompareDocumentsMenu',
+				'type': 'menubutton',
+				'text': _UNO('.uno:CompareDocuments', 'text'),
+				'command': '.uno:CompareDocuments',
+				'accessibility': { focusBack: true, combination: 'RO', de: null }
+			},
+			hideChangeTrackingControls ? {} : { type: 'separator', id: 'review-compare-break', orientation: 'vertical' },
 			{
 				'id': 'review-accessibility-check',
 				'class': 'unoAccessibilityCheck',
 				'type': 'bigtoolitem',
-				'text': _UNO('.uno:AccessibilityCheck', 'text'),
+				'text': _UNO('.uno:AccessibilityCheck', 'text', true),
 				'command': '.uno:SidebarDeck.A11yCheckDeck',
 				'accessibility': { focusBack: false, combination: 'A1', de: 'B' }
 			}

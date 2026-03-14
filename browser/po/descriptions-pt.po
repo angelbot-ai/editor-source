@@ -1,13 +1,13 @@
 # Sérgio Morais <lalocas@protonmail.com>, 2021.
 # Andras Timar <andras.timar@collabora.com>, 2021.
-# SC <larcansal@users.noreply.hosted.weblate.org>, 2024.
+# SC <larcansal@users.noreply.hosted.weblate.org>, 2024, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-17 08:08+0200\n"
-"PO-Revision-Date: 2024-09-02 20:22+0000\n"
-"Last-Translator: SC <larcansal@users.noreply.hosted.weblate.org>\n"
+"POT-Creation-Date: 2026-02-13 19:20+0200\n"
+"PO-Revision-Date: 2026-02-03 12:32+0000\n"
+"Last-Translator: Anonymous <noreply@weblate.org>\n"
 "Language-Team: Portuguese <https://hosted.weblate.org/projects/collabora-"
 "online/app-store-descriptions/pt/>\n"
 "Language: pt\n"

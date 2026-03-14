@@ -1,12 +1,12 @@
-# Rob Pearson <rob.dunedin@gmail.com>, 2020, 2021, 2024.
+# Rob Pearson <rob.dunedin@gmail.com>, 2020, 2021, 2024, 2026.
 # Andras Timar <andras.timar@collabora.com>, 2021.
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-11-17 08:08+0200\n"
-"PO-Revision-Date: 2024-09-14 23:35+0000\n"
-"Last-Translator: Rob Pearson <rob.dunedin@gmail.com>\n"
+"POT-Creation-Date: 2026-02-13 19:20+0200\n"
+"PO-Revision-Date: 2026-02-03 12:13+0000\n"
+"Last-Translator: Anonymous <noreply@weblate.org>\n"
 "Language-Team: English (South Africa) <https://hosted.weblate.org/projects/"
 "collabora-online/app-store-descriptions/en_ZA/>\n"
 "Language: en_ZA\n"

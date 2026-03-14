@@ -72,6 +72,10 @@ function _menubuttonControl (parentContainer, data, builder) {
 		var options = {hasDropdownArrow: menuEntries.length > 1};
 		var control = builder._unoToolButton(parentContainer, data, builder, options);
 
+		if (!window.L.DomUtil.hasClass(control.container, 'selected')) {
+			control.button.removeAttribute('aria-pressed');
+		}
+
 		var isSplitButton = !!data.applyCallback;
 		// can be function or string with command identifier
 		const applyCallback =
@@ -164,16 +168,14 @@ function _menubuttonControl (parentContainer, data, builder) {
 		button.title = data.text;
 		button.setAttribute('aria-haspopup', true);
 
-		if (data.aria && data.aria.label) {
-			button.setAttribute('aria-label', data.aria.label);
-		}
+		JSDialog.SetupA11yLabelForNonLabelableElement(button, data, builder);
 
 		if (data.image) {
 			var image = window.L.DomUtil.create('img', '', button);
 			image.src = data.image;
 			image.setAttribute('alt', '');
 		}
-		var label = window.L.DomUtil.create('span', '', button);
+		var label = window.L.DomUtil.create('span', 'unolabel', button);
 		label.innerText = data.text ? data.text : '';
 		window.L.DomUtil.create('i', 'arrow', button);
 

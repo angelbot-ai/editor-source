@@ -827,6 +827,21 @@ function onInsertBackground() {
 	return false;
 }
 
+function onCompareDocuments() {
+	const compareDocuments = window.L.DomUtil.get('comparedocuments');
+	if ('files' in compareDocuments) {
+		for (let i = 0; i < compareDocuments.files.length; i++) {
+			const file = compareDocuments.files[i];
+			// Remember old file name for CompareChangesLabelSection
+			app.writer.compareDocumentOldFileName = file.name;
+			map.compareDocuments(file);
+		}
+	}
+
+	compareDocuments.value = null;
+	return false;
+}
+
 function onWopiProps(e) {
 	if (e.DisableCopy) {
 		$('#addressInput input').bind('copy', function(evt) {
@@ -1014,6 +1029,9 @@ function onUpdatePermission(e) {
 			}
 		}
 
+		if (window.mode.isDesktop())
+			return;
+
 		if (e.detail.perm === 'edit') {
 			$('#toolbar-mobile-back').removeClass('editmode-off');
 			$('#toolbar-mobile-back').addClass('editmode-on');
@@ -1048,6 +1066,7 @@ $(document).ready(function() {
 	// Update supported media mime type insertion
 	const supportedGraphicMime = app.LOUtil.graphicMimeFilter.join(",");
 	const supportedMediaMime = app.LOUtil.mediaMimeFilter.join(",");
+	const supportedDocumentMime = app.LOUtil.documentMimeFilter.join(",");
 
 	const insertgraphic = window.L.DomUtil.get('insertgraphic');
 	if (insertgraphic) {
@@ -1065,6 +1084,12 @@ $(document).ready(function() {
 	if (selectbackground) {
 		selectbackground.accept = supportedGraphicMime;
 		selectbackground.addEventListener('change', onInsertBackground);
+	}
+
+	const comparedocuments = window.L.DomUtil.get('comparedocuments');
+	if (comparedocuments) {
+		comparedocuments.accept = supportedDocumentMime;
+		comparedocuments.addEventListener('change', onCompareDocuments);
 	}
 });
 

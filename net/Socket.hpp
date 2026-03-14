@@ -255,14 +255,9 @@ public:
             const int val = 1;
             if (::setsockopt(_fd, IPPROTO_TCP, TCP_NODELAY, (char*)&val, sizeof(val)) == -1)
             {
-                static std::once_flag once;
-                std::call_once(once,
-                               [&]()
-                               {
-                                   LOG_WRN("Failed setsockopt TCP_NODELAY. Will not report further "
-                                           "failures to set TCP_NODELAY: "
-                                           << strerror(errno));
-                               });
+                LOG_WRN_ONCE("Failed setsockopt TCP_NODELAY. Will not report further "
+                             "failures to set TCP_NODELAY: "
+                             << strerror(errno));
             }
         }
     }
@@ -309,7 +304,7 @@ public:
     }
 
     /// Gets the actual send buffer size in bytes, -1 for failure.
-    int getSocketBufferSize() const
+    [[nodiscard]] int getSocketBufferSize() const
     {
 #if !MOBILEAPP
         int size;
@@ -1115,7 +1110,8 @@ private:
         _pollFds[size].revents = 0;
     }
 
-    std::string logInfo() const {
+    [[nodiscard]] std::string logInfo() const
+    {
         std::ostringstream os;
         os << "SocketPoll[this " << std::hex << this << std::dec
            << ", thread[name " << _name

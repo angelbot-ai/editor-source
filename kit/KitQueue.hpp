@@ -98,7 +98,15 @@ public:
     /// render queue, with it's priority.
     TileCombined popTileQueue(TilePrioritizer::Priority& priority);
     size_t getTileQueueSize() const;
-    bool isTileQueueEmpty() const;
+    [[nodiscard]] bool isTileQueueEmpty() const
+    {
+        for (const auto& queue : _tileQueues)
+        {
+            if (!queue.second.empty())
+                return false;
+        }
+        return true;
+    }
 
     /// Obtain the next callback
     Callback getCallback()
@@ -169,7 +177,6 @@ private:
     /// @return New message to put into the queue.  If empty, use what was in callbackMsg.
     std::string removeCallbackDuplicate(const std::string& callbackMsg);
 
-    std::vector<TileDesc>* getTileQueue(CanonicalViewId viewid);
     std::vector<TileDesc>& ensureTileQueue(CanonicalViewId viewid);
     TileCombined popTileQueue(std::vector<TileDesc>& tileQueue, TilePrioritizer::Priority &priority);
 
